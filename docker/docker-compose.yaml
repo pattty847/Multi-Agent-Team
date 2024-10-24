@@ -1,0 +1,38 @@
+# docker/docker-compose.yml
+version: '3.8'
+
+services:
+  multi_agent:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: multi_agent_system
+    volumes:
+      - type: bind
+        source: ${PWD}/..  # Will be converted to Windows path
+        target: /workspace
+      - type: volume
+        source: pip_cache
+        target: /home/developer/.cache/pip
+      - type: volume
+        source: model_cache
+        target: /home/developer/.cache/huggingface
+    environment:
+      - PYTHONPATH=/workspace
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PYTHONUNBUFFERED=1  # Better logging on Windows
+    ports:
+      - "8888:8888"  # Jupyter
+      - "5000:5000"  # For potential API
+    # Windows doesn't support GPU passthrough like Linux
+    # Use WSL2 backend in Docker Desktop for GPU support
+    deploy:
+      resources:
+        limits:
+          memory: 8G  # Adjust based on your system
+    restart: unless-stopped
+    command: jupyter lab --ip 0.0.0.0 --port 8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''
+
+volumes:
+  pip_cache:
+  model_cache:
