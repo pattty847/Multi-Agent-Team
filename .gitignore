@@ -16,3 +16,10 @@ venv
 data/*
 workspace/*
 notebooks/.ipynb_checkpoints
+venv
+.idea
+.vscode
+*.log
+data/*
+workspace/*
+notebooks/.ipynb_checkpoints
