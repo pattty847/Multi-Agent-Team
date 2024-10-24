@@ -1,4 +1,5 @@
 .git
+.cache
 .gitignore
 .env
 .env.template
