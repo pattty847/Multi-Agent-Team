@@ -3,7 +3,8 @@ import sys
 import atexit
 from src.config import SystemConfig
 from src.executor import EnhancedDockerExecutor
-from src.team_task import GroupTaskManager
+from src.agents import TeamManager
+from src.task_decomposition import decompose_and_execute
 
 def cleanup(executor):
     """Ensure cleanup happens exactly once"""
@@ -16,26 +17,6 @@ def cleanup(executor):
         print(f"\nError during cleanup: {str(e)}")
     finally:
         cleanup.done = True
-
-def print_result_summary(result: dict):
-    """Print a formatted summary of the task execution"""
-    print("\nTask Execution Summary:")
-    print("=" * 50)
-    
-    if "error" in result:
-        print(f"\n❌ Task Failed:")
-        print(f"Error: {result['error']}")
-    else:
-        print("\n✅ Task Completed")
-        print(f"\nParticipants:")
-        for participant in result['participants']:
-            print(f"- {participant}")
-        
-        if result.get('chat_history'):
-            print("\nKey Discussion Points:")
-            for msg in result['chat_history'][-3:]:  # Show last 3 messages
-                if isinstance(msg, dict) and 'content' in msg:
-                    print(f"\n- {msg['content'][:100]}...")
 
 def main():
     # Initialize configuration
@@ -53,24 +34,28 @@ def main():
         # Register cleanup
         atexit.register(cleanup, executor)
         
-        # Create task manager
-        task_manager = GroupTaskManager(config, executor)
+        # Create team manager
+        team_manager = TeamManager(config, executor)
         
-        # Example task that requires multiple agents
-        task = """Research and implement a visualization of recent AI breakthroughs.
-        1. Research recent AI papers
-        2. Create visualizations of key findings
-        3. Implement interactive dashboard
-        4. Ensure code quality and documentation"""
+        # Example complex task
+        task = """Create a comprehensive analysis of recent AI developments:
+        1. Research recent AI papers and breakthroughs
+        2. Analyze their potential impact
+        3. Create visualizations of key findings
+        4. Implement code examples
+        5. Ensure quality and accuracy
+        """
         
-        # Required agents for this task
-        required_agents = ["research", "viz", "code", "qa", "pm"]
+        # Decompose and execute the task
+        results = decompose_and_execute(task, config, team_manager)
         
-        # Execute the task
-        result = task_manager.execute_task(task, required_agents)
-        
-        # Print summary
-        print_result_summary(result)
+        # Print results
+        print("\nTask Completion Summary:")
+        print("=" * 50)
+        for task_id, result in results.items():
+            print(f"\nTask {task_id}:")
+            print("-" * 20)
+            print(result)
         
     except KeyboardInterrupt:
         print("\nTerminated by user.")

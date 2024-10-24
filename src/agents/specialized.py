@@ -1,6 +1,10 @@
 # src/agents/specialized.py
 from typing import Dict, List, Optional
 from autogen import AssistantAgent, ConversableAgent
+from autogen import GroupChat, GroupChatManager
+
+
+from src.agents.base import BaseAssistantAgent
 from ..config import SystemConfig
 
 class ResearchAgent(AssistantAgent):
@@ -96,6 +100,7 @@ class QAAgent(AssistantAgent):
             llm_config={"config_list": config.llm_config_list}
         )
 
+
 class TeamManager:
     """Manages a team of specialized agents"""
     def __init__(self, config: SystemConfig, executor):
@@ -103,7 +108,7 @@ class TeamManager:
         self.executor = executor
         self.agents = self._initialize_agents()
         
-    def _initialize_agents(self) -> Dict[str, AssistantAgent]:
+    def _initialize_agents(self) -> Dict[str, BaseAssistantAgent]:
         """Initialize all specialized agents"""
         return {
             "research": ResearchAgent(self.config),
@@ -113,10 +118,125 @@ class TeamManager:
             "qa": QAAgent(self.config)
         }
     
-    def get_agent(self, role: str) -> Optional[AssistantAgent]:
+    def get_agent(self, role: str) -> Optional[BaseAssistantAgent]:
         """Get an agent by their role"""
         return self.agents.get(role)
     
-    def get_all_agents(self) -> List[AssistantAgent]:
+    def get_all_agents(self) -> List[BaseAssistantAgent]:
         """Get all agents"""
         return list(self.agents.values())
+
+    def execute_group_task(
+        self, 
+        task_description: str, 
+        agents: List[BaseAssistantAgent],
+        max_rounds: int = 10
+    ) -> Dict:
+        """
+        Execute a task using a group of agents.
+        
+        Args:
+            task_description: Description of the task to be executed
+            agents: List of agents to participate in the task
+            max_rounds: Maximum number of conversation rounds
+            
+        Returns:
+            Dict containing execution results and conversation history
+        """
+        # Ensure we have at least one agent
+        if not agents:
+            raise ValueError("At least one agent is required for group task execution")
+            
+        # Add project manager if not present
+        if self.agents["pm"] not in agents:
+            agents = [self.agents["pm"]] + list(agents)
+            
+        # Create group chat
+        groupchat = GroupChat(
+            agents=agents,
+            messages=[],
+            max_round=max_rounds,
+            speaker_selection_method="auto",
+        )
+        
+        # Create chat manager
+        manager = GroupChatManager(
+            groupchat=groupchat,
+            llm_config={"config_list": self.config.llm_config_list},
+            system_message=f"""Coordinate the completion of this task:
+            {task_description}
+            
+            Ensure each agent contributes according to their expertise.
+            The project manager should coordinate the overall effort.
+            Verify results before marking the task as complete."""
+        )
+        
+        try:
+            # Start the group chat
+            chat_result = agents[0].initiate_chat(
+                manager,
+                message=f"""Task Description:
+                {task_description}
+                
+                Please work together to complete this task. Each agent should contribute
+                based on their expertise. Begin by analyzing the requirements and creating
+                a plan of action.""",
+            )
+            
+            # Process results
+            result = {
+                "success": True,
+                "chat_history": groupchat.messages,
+                "summary": chat_result.summary if hasattr(chat_result, 'summary') else None,
+                "cost": chat_result.cost if hasattr(chat_result, 'cost') else None,
+                "participants": [agent.name for agent in agents]
+            }
+            
+        except Exception as e:
+            result = {
+                "success": False,
+                "error": str(e),
+                "chat_history": groupchat.messages if 'groupchat' in locals() else [],
+                "participants": [agent.name for agent in agents]
+            }
+            
+        return result
+
+    def execute_sequential_tasks(
+        self, 
+        tasks: List[Dict],
+        required_agents: List[str]
+    ) -> List[Dict]:
+        """
+        Execute a sequence of related tasks.
+        
+        Args:
+            tasks: List of task descriptions and requirements
+            required_agents: List of agent roles required for the tasks
+            
+        Returns:
+            List of execution results for each task
+        """
+        results = []
+        
+        # Get required agents
+        agents = [
+            self.get_agent(role)
+            for role in required_agents
+            if self.get_agent(role) is not None
+        ]
+        
+        # Execute each task in sequence
+        for task in tasks:
+            result = self.execute_group_task(
+                task_description=task["description"],
+                agents=agents,
+                max_rounds=task.get("max_rounds", 10)
+            )
+            results.append(result)
+            
+            # Break if a task fails
+            if not result["success"]:
+                break
+                
+        return results

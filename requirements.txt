@@ -1,0 +1,9 @@
+autogen-agentchat==0.2.37
+beautifulsoup4==4.12.2
+requests==2.31.0
+python-dotenv==1.0.0
+jupyter==1.0.0
+jupyterlab==4.0.11
+lxml==5.0.1
+fake-useragent==1.4.0
+flaml[automl]
