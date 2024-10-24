@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  multi_agent:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: multi_agent_system
+    volumes:
+      - ..:/workspace
+      - pip_cache:/root/.cache/pip
+      - model_cache:/root/.cache/huggingface
+    environment:
+      - PYTHONPATH=/workspace
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8888:8888"
+      - "5000:5000"
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    restart: unless-stopped
+    networks:
+      - agent_net
+
+networks:
+  agent_net:
+    driver: bridge
+
+volumes:
+  pip_cache:
+  model_cache:
