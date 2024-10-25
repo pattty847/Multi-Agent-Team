@@ -1,205 +1,228 @@
 import dearpygui.dearpygui as dpg
-import threading
-from typing import Dict
-import time
+from typing import Dict, List, Optional
+import queue
+import tkinter as tk
 import logging
-from autogen import GroupChat
-from src.agents.monitored_agent import TeamConfiguration
-from src.ui.workflow_monitor import WorkflowMonitor
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class AgentWorkflowApp:
+class AgentMonitor:
     def __init__(self):
-        self.workflow_monitor = WorkflowMonitor()
-        self.active_teams: Dict[str, GroupChat] = {}
-        self.is_running = False
+        self.message_queue = queue.Queue()
+        self.agents: Dict[str, Dict] = {}
+        self.workflows: Dict[str, Dict] = {}
+        self.selected_workflow_id: Optional[str] = None
+        
+        # Performance metrics
+        self.metrics = {
+            "messages_processed": 0,
+            "active_workflows": 0,
+            "tasks_completed": 0
+        }
+
+        root = tk.Tk()
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        root.destroy()  # Close the tkinter window
+
+        # Calculate viewport dimensions as 80% of screen size
+        self.viewport_width = int(screen_width * 0.8)
+        self.viewport_height = int(screen_height * 0.8)
+
+        # Create context
+        dpg.create_context()
 
     def setup_ui(self):
-        """Initialize the UI components"""
-        logger.info("Setting up UI...")
-        
-        dpg.create_context()
-        
-        # Setup theme
-        with dpg.theme() as global_theme:
-            with dpg.theme_component(dpg.mvAll):
-                dpg.add_theme_color(dpg.mvThemeCol_WindowBg, (15, 15, 15))
-                dpg.add_theme_color(dpg.mvThemeCol_TitleBg, (30, 30, 30))
-                dpg.add_theme_color(dpg.mvThemeCol_Text, (255, 255, 255))
-        
-        dpg.bind_theme(global_theme)
-        
+        """Initialize the monitoring UI components"""
         # Create viewport
-        dpg.create_viewport(
-            title="AI Agent Workflow Monitor",
-            width=1200,
-            height=800,
-            resizable=True
-        )
-
-        # Create main window
-        with dpg.window(
-            label="AI Agent Workflow Monitor",
-            tag="main_window",
-            pos=(0, 0),
-            width=1200,
-            height=800,
-            no_close=True
-        ):
-            # Left panel for workflow selection and stats
-            with dpg.group(horizontal=False, width=300):
-                dpg.add_text("Active Workflows")
-                self.workflow_list = dpg.add_listbox(
-                    tag="workflow_list",
-                    items=[],
-                    callback=self.workflow_monitor.select_workflow_callback,
-                    width=280,
-                    num_items=10
-                )
-
-                dpg.add_separator()
-                dpg.add_text("System Statistics")
-                self.stats_group = dpg.add_group(tag="stats_group")
-
-            # Right panel for visualizations
-            with dpg.group(horizontal=False):
-                with dpg.tab_bar():
-                    with dpg.tab(label="Graph View"):
-                        self.workflow_monitor.graph_view_id = dpg.add_drawlist(
-                            width=800,
-                            height=600,
-                            tag="graph_view"
-                        )
-                    with dpg.tab(label="Timeline"):
-                        self.workflow_monitor.timeline_view_id = dpg.add_drawlist(
-                            width=800,
-                            height=600,
-                            tag="timeline_view"
+        dpg.create_viewport(title="Agent Monitoring System", width=self.viewport_width, height=self.viewport_height)
+        
+        with dpg.window(label="Agent Monitor", tag="primary_window"):
+            with dpg.group(horizontal=True):
+                # Left panel - Controls and Status
+                with dpg.child_window(width=300, height=-1):
+                    with dpg.collapsing_header(label="System Status", default_open=True):
+                        dpg.add_text("Active Agents:", tag="active_agents_text")
+                        dpg.add_text("Active Workflows:", tag="active_workflows_text")
+                        dpg.add_text("Messages Processed:", tag="messages_text")
+                    
+                    with dpg.collapsing_header(label="Workflow Control", default_open=True):
+                        dpg.add_button(label="Start New Workflow", callback=self.start_new_workflow)
+                        dpg.add_button(label="Stop Selected", callback=self.stop_selected_workflow)
+                        
+                    with dpg.collapsing_header(label="Agent List", default_open=True):
+                        self.agent_list = dpg.add_listbox(
+                            tag="agent_list",
+                            items=[],
+                            num_items=10,
+                            callback=self.select_agent
                         )
 
-        # Configure viewport
-        dpg.set_primary_window("main_window", True)
-        logger.info("UI setup complete")
+                # Right panel - Visualizations
+                with dpg.child_window(width=900, height=-1):
+                    with dpg.tab_bar():
+                        with dpg.tab(label="Workflow Graph"):
+                            self.graph_view = dpg.add_drawlist(width=880, height=400)
+                            
+                        with dpg.tab(label="Message Log"):
+                            self.message_log = dpg.add_child_window(width=880, height=400)
+                            
+                        with dpg.tab(label="Metrics"):
+                            with dpg.plot(label="Activity Over Time", height=400):
+                                dpg.add_plot_legend()
+                                dpg.add_plot_axis(dpg.mvXAxis, label="Time")
+                                self.x_axis = dpg.last_item()
+                                dpg.add_plot_axis(dpg.mvYAxis, label="Count")
+                                self.y_axis = dpg.last_item()
+                                
+                                self.message_series = dpg.add_line_series(
+                                    [], [], label="Messages",
+                                    parent=self.y_axis
+                                )
 
-    def update_workflow_list(self):
-        """Update the workflow list in the UI"""
-        items = list(self.workflow_monitor.active_workflows.keys())
-        dpg.configure_item("workflow_list", items=items)
+        # Set primary window and show viewport
+        dpg.set_primary_window("primary_window", True)
 
-    def update_stats(self):
-        """Update system statistics"""
-        try:
-            dpg.delete_item("stats_group", children_only=True)
-            with dpg.group(parent="stats_group"):
-                dpg.add_text(f"Active Teams: {len(self.active_teams)}")
-                dpg.add_text(f"Total Messages: {self.count_total_messages()}")
-                dpg.add_text(f"Active Agents: {self.count_active_agents()}")
-        except Exception as e:
-            logger.error(f"Error updating stats: {e}")
+    def start_new_workflow(self, sender, app_data):
+        """Start a new agent workflow"""
+        logger.info("Starting new workflow")
+        # Implementation here - safe to call from UI thread
 
-    def count_total_messages(self) -> int:
-        """Count total messages across all workflows"""
-        total = 0
-        for workflow in self.workflow_monitor.active_workflows.values():
-            total += len(workflow.get('interactions', []))
-        return total
+    def stop_selected_workflow(self, sender, app_data):
+        """Stop the currently selected workflow"""
+        if self.selected_workflow_id:
+            logger.info(f"Stopping workflow {self.selected_workflow_id}")
+            # Implementation here - safe to call from UI thread
 
-    def count_active_agents(self) -> int:
-        """Count total unique agents across all workflows"""
-        agents = set()
-        for workflow in self.workflow_monitor.active_workflows.values():
-            for agent in workflow.get('agents', []):
-                agents.add(agent['name'])
-        return len(agents)
+    def select_agent(self, sender, app_data):
+        """Handle agent selection from the list"""
+        selected_agent = self.agents.get(app_data)
+        if selected_agent:
+            logger.info(f"Selected agent: {app_data}")
+            # Update UI elements for selected agent
 
-    def start_demo_workflow(self):
-        """Start a demo workflow to showcase the UI"""
-        logger.info("Starting demo workflows...")
+    def update_metrics(self):
+        """Update UI metrics - safe to call from render loop"""
+        dpg.set_value("active_agents_text", f"Active Agents: {len(self.agents)}")
+        dpg.set_value("active_workflows_text", f"Active Workflows: {self.metrics['active_workflows']}")
+        dpg.set_value("messages_text", f"Messages: {self.metrics['messages_processed']}")
+
+    def update_graph(self):
+        """Update the workflow graph visualization - safe to call from render loop"""
+        if not self.selected_workflow_id:
+            return
+
+        workflow = self.workflows.get(self.selected_workflow_id)
+        if not workflow:
+            return
+
+        # Clear previous graph
+        dpg.delete_item(self.graph_view, children_only=True)
         
-        # Create a research team
-        team_config = TeamConfiguration(self.workflow_monitor)
-        research_team = team_config.create_research_team()
-        self.active_teams[team_config.workflow_id] = research_team
+        # Draw nodes and edges
+        node_positions = {}
+        for agent in workflow['agents']:
+            x = len(node_positions) * 100 + 50
+            y = 200
+            node_positions[agent['name']] = (x, y)
+            
+            # Draw node
+            dpg.draw_circle((x, y), 20, parent=self.graph_view, fill=(0, 255, 0, 100))
+            dpg.draw_text((x-30, y+25), agent['name'], parent=self.graph_view)
 
-        # Update UI
-        self.update_workflow_list()
+        # Draw edges for interactions
+        for interaction in workflow['interactions']:
+            if interaction['from'] in node_positions and interaction['to'] in node_positions:
+                start = node_positions[interaction['from']]
+                end = node_positions[interaction['to']]
+                dpg.draw_line(start, end, parent=self.graph_view, color=(255, 255, 255, 100))
+
+    def process_message(self, message: Dict):
+        """Process incoming messages - safe to call from render loop"""
+        msg_type = message.get('type')
         
-        # Start the research workflow in a separate thread
-        def run_research():
-            try:
-                researcher = research_team.agent_by_name("Researcher")
-                researcher.initiate_chat(
-                    research_team.agent_by_name("Analyst"),
-                    message="Can you help analyze the impact of AI on workplace productivity?"
-                )
-            except Exception as e:
-                logger.error(f"Error in research workflow: {e}")
+        if msg_type == 'new_agent':
+            self.agents[message['agent_id']] = message['data']
+            
+        elif msg_type == 'agent_update':
+            if message['agent_id'] in self.agents:
+                self.agents[message['agent_id']].update(message['data'])
+                
+        elif msg_type == 'new_workflow':
+            self.workflows[message['workflow_id']] = message['data']
+            self.metrics['active_workflows'] += 1
+            
+        elif msg_type == 'workflow_update':
+            if message['workflow_id'] in self.workflows:
+                self.workflows[message['workflow_id']].update(message['data'])
+                
+        elif msg_type == 'message':
+            self.metrics['messages_processed'] += 1
 
-        research_thread = threading.Thread(target=run_research, daemon=True)
-        research_thread.start()
-
-        # Create a development team after a delay
-        time.sleep(2)
-        team_config = TeamConfiguration(self.workflow_monitor)
-        dev_team = team_config.create_development_team()
-        self.active_teams[team_config.workflow_id] = dev_team
-
-        # Update UI
-        self.update_workflow_list()
-
-        # Start the development workflow
-        def run_development():
-            try:
-                architect = dev_team.agent_by_name("Architect")
-                architect.initiate_chat(
-                    dev_team.agent_by_name("Developer"),
-                    message="Let's design a new microservice for user authentication."
-                )
-            except Exception as e:
-                logger.error(f"Error in development workflow: {e}")
-
-        dev_thread = threading.Thread(target=run_development, daemon=True)
-        dev_thread.start()
-        
-        logger.info("Demo workflows started")
+        # Update UI elements
+        dpg.configure_item("agent_list", items=list(self.agents.keys()))
 
     def run(self):
-        """Start the application"""
-        try:
-            logger.info("Starting application...")
-            self.setup_ui()
+        """Main application loop using DearPyGui's render loop"""
+        # Setup and show viewport
+        dpg.setup_dearpygui()
+        dpg.show_viewport()
+
+        # Main loop
+        while dpg.is_dearpygui_running():
+            # Process any messages in queue
+            try:
+                while not self.message_queue.empty():
+                    msg = self.message_queue.get_nowait()
+                    self.process_message(msg)
+            except queue.Empty:
+                pass
+
+            # Update UI
+            self.update_metrics()
+            self.update_graph()
             
-            # Show viewport
-            dpg.show_viewport()
-            dpg.setup_dearpygui()
-            
-            # Start demo workflows after a short delay
-            threading.Timer(1.0, self.start_demo_workflow).start()
-            
-            # Main application loop
-            self.is_running = True
-            while self.is_running and dpg.is_dearpygui_running():
-                self.update_stats()
-                dpg.render_dearpygui_frame()
-                time.sleep(0.1)  # Add a small delay to prevent high CPU usage
-                
-            logger.info("Application shutdown initiated")
-            dpg.destroy_context()
-            
-        except Exception as e:
-            logger.error(f"Application error: {e}")
-            raise
+            # Render frame
+            dpg.render_dearpygui_frame()
+
+        # Cleanup
+        dpg.destroy_context()
 
 def main():
+    logging.basicConfig(level=logging.INFO)
+    
     try:
-        logger.info("Initializing application...")
-        app = AgentWorkflowApp()
-        app.run()
+        # Create monitor instance
+        monitor = AgentMonitor()
+        monitor.setup_ui()
+
+        # Add some test data
+        monitor.message_queue.put({
+            "type": "new_agent",
+            "agent_id": "researcher_1",
+            "data": {
+                "name": "Researcher",
+                "status": "active",
+                "tasks": []
+            }
+        })
+
+        # Add another test agent
+        monitor.message_queue.put({
+            "type": "new_agent", 
+            "agent_id": "analyst_1",
+            "data": {
+                "name": "Analyst",
+                "status": "idle",
+                "tasks": []
+            }
+        })
+
+        # Start the monitor
+        monitor.run()
+
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
+        logger.error(f"Application error: {e}")
         raise
 
 if __name__ == "__main__":
