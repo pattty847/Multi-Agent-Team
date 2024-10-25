@@ -2,10 +2,7 @@
 import requests
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
-import json
 from datetime import datetime
-import time
-import re
 
 class WebSearchTool:
     def __init__(self):

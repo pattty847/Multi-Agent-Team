@@ -23,3 +23,5 @@ venv
 data/*
 workspace/*
 notebooks/.ipynb_checkpoints
+testing/
+docs/
