@@ -226,6 +226,3 @@ def main():
     except Exception as e:
         logger.error(f"Application error: {e}")
         raise
-
-if __name__ == "__main__":
-    main()

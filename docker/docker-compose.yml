@@ -1,34 +1,67 @@
 version: '3.8'
 
 services:
-  multi_agent:
+  api:
     build: 
-      context: ..
-      dockerfile: docker/Dockerfile
-    container_name: multi_agent_system
-    volumes:
-      - ..:/workspace
-      - pip_cache:/root/.cache/pip
-      - model_cache:/root/.cache/huggingface
-    environment:
-      - PYTHONPATH=/workspace
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - PYTHONUNBUFFERED=1
+      context: .
+      dockerfile: Dockerfile.api
     ports:
-      - "8888:8888"
       - "5000:5000"
+    volumes:
+      - ./workspace:/app/workspace
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - agent-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./workspace:/app/workspace
+    environment:
+      - API_URL=http://api:5000
+    networks:
+      - agent-network
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  agent-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    volumes:
+      - ./workspace:/app/workspace
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - agent-network
+    depends_on:
+      - api
     deploy:
+      replicas: 2
       resources:
         limits:
-          memory: 8G
+          cpus: '1'
+          memory: 1G
     restart: unless-stopped
-    networks:
-      - agent_net
 
 networks:
-  agent_net:
+  agent-network:
     driver: bridge
 
 volumes:
-  pip_cache:
-  model_cache:
+  workspace:
+    driver: local
