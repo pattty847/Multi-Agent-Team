@@ -15,6 +15,47 @@ This project is a multi-agent system designed to assist with coding, analysis, a
 
 The multi-agent system is built using Python and Docker. It includes components for web searching, code execution, and user interaction through a conversational interface. The system is designed to be extensible, allowing for the integration of additional tools and functionalities.
 
+## High-level overview:
+
+1. Core Differentiators:
+```python
+class UnifiedTeamOrchestrator:
+    """Combines:
+    - Real-world management principles
+    - Advanced task decomposition
+    - Dynamic role assignment 
+    - Real-time monitoring
+    - Visual workflow tracking
+    """
+```
+
+2. Key Innovations:
+- Fact-based planning: Uses verified facts, facts to look up, and educated guesses
+- Business-inspired workflow: Based on real management experience
+- Visual monitoring: Real-time tracking and visualization
+- Stall detection: Identifies and handles blocked progress
+- Role optimization: Matches agent capabilities to tasks
+
+3. Architecture Flow:
+```mermaid
+graph TD
+    A[Initial Task] --> B[Fact Gathering]
+    B --> C[Task Planning]
+    C --> D[Role Assignment]
+    D --> E[Execution]
+    E --> F[Monitoring]
+    F -->|Success| G[Complete]
+    F -->|Stalled| H[Replan]
+    H --> B
+```
+
+4. What Sets Us Apart:
+- Business-driven design vs purely academic approaches
+- Real-time visualization vs black box execution
+- Practical management principles vs theoretical frameworks
+- Focus on tracking and improvement vs just task completion
+
+
 ## Project Structure
 
 - **src/**: Contains the main source code for the agents, configuration, and execution logic.
