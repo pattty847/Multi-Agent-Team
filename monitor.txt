@@ -9,9 +9,6 @@ import math
 from datetime import datetime
 import tkinter as tk
 
-from src.config import SystemConfig
-from src.workflow_manager import WorkflowManager
-
 def get_screen_size_percentage(percentage=0.80):
     # Create a root window and hide it
     root = tk.Tk()
@@ -33,16 +30,11 @@ def get_screen_size_percentage(percentage=0.80):
 logger = logging.getLogger(__name__)
 
 class AgentMonitor:
-    def __init__(self, config: SystemConfig):
+    def __init__(self):
         self.message_queue = queue.Queue()
         self.agents: Dict[str, Dict] = {}
-        self.workflows: Dict[str, Dict] = {}  # Single workflow store
+        self.workflows: Dict[str, Dict] = {}
         self.selected_workflow_id: Optional[str] = None
-        
-        # View IDs
-        self.graph_view: Optional[int] = None
-        self.timeline_view: Optional[int] = None
-        self.message_log: Optional[int] = None
         
         # Performance metrics
         self.metrics = {
@@ -52,74 +44,9 @@ class AgentMonitor:
         }
         
         self.width, self.height = get_screen_size_percentage()
-        
+
         # Create context
         dpg.create_context()
-        
-        self.workflow_manager = WorkflowManager(config, self.message_queue)
-    
-    def _setup_control_panel(self):
-        """Setup workflow control panel"""
-        with dpg.collapsing_header(label="Workflow Control", default_open=True):
-            with dpg.group(horizontal=True):
-                dpg.add_combo(
-                    ["research", "development"],
-                    label="Workflow Type",
-                    default_value="research",
-                    tag="workflow_type"
-                )
-            
-            dpg.add_input_text(
-                label="Task Description",
-                multiline=True,
-                height=100,
-                tag="task_input"
-            )
-            
-            dpg.add_button(
-                label="Start New Workflow",
-                callback=self.start_new_workflow,
-                width=-1
-            )
-            dpg.add_button(
-                label="Stop Selected Workflow",
-                callback=self.stop_selected_workflow,
-                width=-1
-            )
-    
-    def start_new_workflow(self, sender, app_data):
-        """Start a new agent workflow"""
-        try:
-            workflow_type = dpg.get_value("workflow_type")
-            task = dpg.get_value("task_input")
-            
-            if not task.strip():
-                logger.warning("Task description required")
-                return
-            
-            # Create and start workflow
-            workflow_id = self.workflow_manager.create_workflow(
-                workflow_type=workflow_type,
-                task=task
-            )
-            self.workflow_manager.start_workflow(workflow_id)
-            
-            # Clear input
-            dpg.set_value("task_input", "")
-            
-            logger.info(f"Started new {workflow_type} workflow: {workflow_id}")
-            
-        except Exception as e:
-            logger.error(f"Error starting workflow: {e}")
-    
-    def stop_selected_workflow(self, sender, app_data):
-        """Stop the currently selected workflow"""
-        if self.selected_workflow_id:
-            try:
-                self.workflow_manager.stop_workflow(self.selected_workflow_id)
-                logger.info(f"Stopped workflow {self.selected_workflow_id}")
-            except Exception as e:
-                logger.error(f"Error stopping workflow: {e}")
 
     def setup_ui(self):
         """Initialize the monitoring UI components"""
