@@ -61,29 +61,41 @@ class AgentMonitor:
     def _setup_control_panel(self):
         """Setup workflow control panel"""
         with dpg.collapsing_header(label="Workflow Control", default_open=True):
-            with dpg.group(horizontal=True):
-                dpg.add_combo(
-                    ["research", "development"],
-                    label="Workflow Type",
-                    default_value="research",
-                    tag="workflow_type"
-                )
+            # Add workflow type selector
+            dpg.add_combo(
+                items=["research", "development"],
+                label="Workflow Type",
+                default_value="research",
+                width=-1,
+                tag="workflow_type"
+            )
             
+            # Add task input
             dpg.add_input_text(
                 label="Task Description",
                 multiline=True,
                 height=100,
+                width=-1,
                 tag="task_input"
             )
             
+            # Add control buttons with some spacing
+            dpg.add_spacing(count=5)
             dpg.add_button(
                 label="Start New Workflow",
                 callback=self.start_new_workflow,
                 width=-1
             )
+            dpg.add_spacing(count=2)
             dpg.add_button(
-                label="Stop Selected Workflow",
+                label="Stop Selected",
                 callback=self.stop_selected_workflow,
+                width=-1
+            )
+            dpg.add_spacing(count=2)
+            dpg.add_button(
+                label="Clear Completed",
+                # callback=self.clear_completed_workflows,
                 width=-1
             )
     
@@ -124,53 +136,125 @@ class AgentMonitor:
     def setup_ui(self):
         """Initialize the monitoring UI components"""
         # Create viewport
-        dpg.create_viewport(title="Agent Monitoring System", width=self.width, height=self.height)
+        dpg.create_viewport(
+            title="Agent Monitoring System",
+            width=self.width,
+            height=self.height
+        )
+
+        # Setup theme
+        with dpg.theme() as global_theme:
+            with dpg.theme_component(dpg.mvAll):
+                dpg.add_theme_color(dpg.mvThemeCol_WindowBg, (15, 15, 15))
+                dpg.add_theme_color(dpg.mvThemeCol_TitleBg, (30, 30, 30))
+                dpg.add_theme_color(dpg.mvThemeCol_TitleBgActive, (40, 40, 40))
+                dpg.add_theme_color(dpg.mvThemeCol_Button, (50, 50, 50))
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (70, 70, 70))
+                dpg.add_theme_color(dpg.mvThemeCol_Text, (255, 255, 255))
         
+        dpg.bind_theme(global_theme)
+        
+        # Create main window
         with dpg.window(label="Agent Monitor", tag="primary_window"):
             with dpg.group(horizontal=True):
-                # Left panel - Controls and Status
-                with dpg.child_window(width=300, height=800):
-                    with dpg.collapsing_header(label="System Status", default_open=True):
-                        dpg.add_text("Active Agents:", tag="active_agents_text")
-                        dpg.add_text("Active Workflows:", tag="active_workflows_text")
-                        dpg.add_text("Messages Processed:", tag="messages_text")
-                    
-                    with dpg.collapsing_header(label="Workflow Control", default_open=True):
-                        dpg.add_button(label="Start New Workflow", callback=self.start_new_workflow)
-                        dpg.add_button(label="Stop Selected", callback=self.stop_selected_workflow)
-                        
-                    with dpg.collapsing_header(label="Agent List", default_open=True):
-                        self.agent_list = dpg.add_listbox(
-                            tag="agent_list",
-                            items=[],
-                            num_items=10,
-                            callback=self.select_agent
-                        )
+                # Left panel - Controls and Status (25% of width)
+                left_width = int(self.width * 0.25)
+                with dpg.child_window(width=left_width, height=self.height-50):
+                    self._setup_control_panel()  # Now being called
+                    self._setup_agent_list()
+                
+                # Right panel - Visualizations (75% of width)
+                right_width = int(self.width * 0.75)
+                with dpg.child_window(width=right_width, height=self.height-50):
+                    pass
+                    # self._setup_visualization_tabs()
 
-                # Right panel - Visualizations
-                with dpg.child_window(width=900, height=800):
-                    with dpg.tab_bar():
-                        with dpg.tab(label="Workflow Graph"):
-                            self.graph_view = dpg.add_drawlist(width=880, height=400)
-                            
-                        with dpg.tab(label="Message Log"):
-                            self.message_log = dpg.add_child_window(width=880, height=400)
-                            
-                        with dpg.tab(label="Metrics"):
-                            with dpg.plot(label="Activity Over Time", height=400):
-                                dpg.add_plot_legend()
-                                dpg.add_plot_axis(dpg.mvXAxis, label="Time")
-                                self.x_axis = dpg.last_item()
-                                dpg.add_plot_axis(dpg.mvYAxis, label="Count")
-                                self.y_axis = dpg.last_item()
-                                
-                                self.message_series = dpg.add_line_series(
-                                    [], [], label="Messages",
-                                    parent=self.y_axis
-                                )
-
-        # Set primary window and show viewport
+        # Set primary window
         dpg.set_primary_window("primary_window", True)
+    
+    def _setup_status_panel(self):
+        """Setup system status panel"""
+        with dpg.collapsing_header(label="System Status", default_open=True):
+            dpg.add_text("Active Agents: 0", tag="active_agents_text")
+            dpg.add_text("Active Workflows: 0", tag="active_workflows_text")
+            dpg.add_text("Messages: 0", tag="messages_text")
+            dpg.add_text("Uptime: 00:00:00", tag="uptime_text")
+
+    def _setup_agent_list(self):
+        """Setup agent list panel"""
+        with dpg.collapsing_header(label="Agent List", default_open=True):
+            dpg.add_listbox(
+                tag="agent_list",
+                items=[],
+                num_items=10,
+                callback=self.select_agent,
+                width=-1
+            )
+            with dpg.group(horizontal=True):
+                dpg.add_button(
+                    label="View Details",
+                    callback=self.view_agent_details,
+                    width=-1
+                )
+
+    def _setup_visualization_tabs(self):
+        """Setup visualization tabs"""
+        with dpg.tab_bar():
+            # Workflow Graph Tab
+            with dpg.tab(label="Workflow Graph"):
+                self.graph_view = dpg.add_drawlist(
+                    width=-1, 
+                    height=int(self.height * 0.7)
+                )
+            
+            # Message Log Tab
+            with dpg.tab(label="Message Log"):
+                self.message_log = dpg.add_child_window(
+                    width=-1,
+                    height=int(self.height * 0.7)
+                )
+                # Add a clear button for the log
+                dpg.add_button(
+                    label="Clear Log",
+                    callback=lambda: dpg.delete_item(self.message_log, children_only=True),
+                    parent=self.message_log
+                )
+            
+            # Metrics Tab
+            with dpg.tab(label="Metrics"):
+                self._setup_metrics_plot()
+
+    def view_agent_details(self, sender, app_data):
+        """Show detailed information about selected agent"""
+        agent_name = dpg.get_value("agent_list")
+        if not agent_name:
+            return
+            
+        agent = self.agents.get(agent_name)
+        if not agent:
+            return
+        
+        # Create or configure the details window
+        if not dpg.does_item_exist("agent_details_window"):
+            with dpg.window(
+                label="Agent Details",
+                tag="agent_details_window",
+                pos=(int(self.width * 0.3), int(self.height * 0.3)),
+                width=400,
+                height=300,
+                show=True
+            ):
+                dpg.add_text("", tag="agent_details_text")
+        
+        # Update details text
+        details = f"""Name: {agent.get('name', 'N/A')}
+        Status: {agent.get('status', 'N/A')}
+        Role: {agent.get('role', 'N/A')}
+        Tasks Completed: {len(agent.get('tasks', []))}
+        Current Task: {agent.get('current_task', 'None')}"""
+            
+        dpg.configure_item("agent_details_text", default_value=details)
+        dpg.show_item("agent_details_window")
 
     def start_new_workflow(self, sender, app_data):
         """Start a new agent workflow"""
@@ -192,9 +276,10 @@ class AgentMonitor:
 
     def update_metrics(self):
         """Update UI metrics - safe to call from render loop"""
-        dpg.set_value("active_agents_text", f"Active Agents: {len(self.agents)}")
-        dpg.set_value("active_workflows_text", f"Active Workflows: {self.metrics['active_workflows']}")
-        dpg.set_value("messages_text", f"Messages: {self.metrics['messages_processed']}")
+        if dpg.does_alias_exist("active_agents_text"):
+            dpg.set_value("active_agents_text", f"Active Agents: {len(self.agents)}")
+            dpg.set_value("active_workflows_text", f"Active Workflows: {self.metrics['active_workflows']}")
+            dpg.set_value("messages_text", f"Messages: {self.metrics['messages_processed']}")
 
     def update_graph(self):
         """Update the workflow graph visualization - safe to call from render loop"""
