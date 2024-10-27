@@ -1,21 +1,20 @@
 # At the top of monitor.py
+import collections
 import dearpygui.dearpygui as dpg
 import logging
 import queue
 import psutil
 import time
+import dearpygui.demo as demo
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 from collections import defaultdict
 import docker
 import tkinter as tk
-import math
-
 from src.core.config import SystemConfig
 from src.core.workflow import WorkflowManager
 
-# Initialize logger
 logger = logging.getLogger(__name__)
 
 
@@ -37,25 +36,32 @@ def get_screen_size_percentage(percentage=0.80):
 
     return width, height
 
-logger = logging.getLogger(__name__)
+class NodeUpdateBuffer:
+    def __init__(self, max_size=100, update_interval=0.1):
+        self.buffer = collections.deque(maxlen=max_size)
+        self.update_interval = update_interval
+        self.last_update = time.time()
+        
+    def add_update(self, node_id, data):
+        self.buffer.append((node_id, data))
+        
+    def should_process(self):
+        return time.time() - self.last_update >= self.update_interval
+        
+    def process_updates(self):
+        if not self.should_process():
+            return
+            
+        # Batch process updates
+        updates = {}
+        while self.buffer:
+            node_id, data = self.buffer.popleft()
+            updates[node_id] = data
+            
+        # Update UI with batched data
+        self.last_update = time.time()
+        return updates
 
-# src/ui/monitor.py
-
-import dearpygui.dearpygui as dpg
-import logging
-import queue
-import psutil
-import time
-from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
-import dearpygui.demo as demo
-import docker
-
-from src.core.config import SystemConfig
-from src.core.workflow import WorkflowManager
-
-logger = logging.getLogger(__name__)
 
 @dataclass
 class AgentState:
@@ -96,6 +102,7 @@ class AgentMonitoringSystem:
         # Basic state
         self.config = config
         self.message_queue = queue.Queue()
+        self.update_buffer = NodeUpdateBuffer()
         self.agents: Dict[str, AgentState] = {}
         self.workflows: Dict[str, Dict] = {}
         self.selected_workflow_id: Optional[str] = None
@@ -162,8 +169,7 @@ class AgentMonitoringSystem:
                             with dpg.tab(label="Workflow View"):
                                 self._setup_node_editor()
                             with dpg.tab(label="Metrics"):
-                                # self._setup_metrics_view()
-                                pass
+                                self._setup_metrics_view()
                             with dpg.tab(label="Message Log"):
                                 self._setup_message_log()
                                 pass
@@ -176,6 +182,64 @@ class AgentMonitoringSystem:
         except Exception as e:
             self.logger.error(f"Error in setup_ui: {str(e)}")
             raise
+
+
+    def _setup_metrics_view(self):
+        """Setup the metrics visualization panel"""
+        with dpg.child_window(label="System Metrics", height=-1):
+            # Create tabs for different metric categories
+            with dpg.tab_bar():
+                with dpg.tab(label="Performance"):
+                    # System-wide metrics
+                    with dpg.group(horizontal=True):
+                        with dpg.child_window(width=300):
+                            dpg.add_text("System Overview")
+                            dpg.add_separator()
+                            self.system_metrics = {
+                                "cpu": dpg.add_text("CPU: 0%"),
+                                "memory": dpg.add_text("Memory: 0 MB"),
+                                "active_agents": dpg.add_text("Active Agents: 0"),
+                                "active_workflows": dpg.add_text("Active Workflows: 0")
+                            }
+
+                            # Performance plots
+                            with dpg.plot(label="System Performance", height=200, width=-1, tag="system_performance_plot"):
+                                # Add legend
+                                dpg.add_plot_legend()
+
+                                # Add axes to the plot and save their references
+                                x_axis = dpg.add_plot_axis(dpg.mvXAxis, label="Time", tag="system_performance_x_axis")
+                                y_axis = dpg.add_plot_axis(dpg.mvYAxis, label="Usage %", tag="system_performance_y_axis")
+
+                                # Add CPU and memory line series to the Y-axis
+                                self.performance_series = {
+                                    "cpu": dpg.add_line_series([], [], label="CPU Usage", parent=y_axis),
+                                    "memory": dpg.add_line_series([], [], label="Memory Usage", parent=y_axis)
+                                }
+
+
+                with dpg.tab(label="Agent Metrics"):
+                    # Agent-specific metrics
+                    self.agent_metrics_window = dpg.add_child_window(height=-1)
+                    
+                with dpg.tab(label="Workflow Metrics"):
+                    # Workflow statistics
+                    with dpg.child_window():
+                        self.workflow_metrics = {
+                            "total": dpg.add_text("Total Workflows: 0"),
+                            "active": dpg.add_text("Active: 0"),
+                            "completed": dpg.add_text("Completed: 0"),
+                            "failed": dpg.add_text("Failed: 0")
+                        }
+                        
+                        dpg.add_separator()
+                        dpg.add_text("Recent Workflow Completion Times")
+                        # Add a plot for workflow completion times
+                        with dpg.plot(label="Completion Times", height=150, width=-1):
+                            dpg.add_plot_axis(dpg.mvXAxis, label="Workflow")
+                            dpg.add_plot_axis(dpg.mvYAxis, label="Time (s)")
+                            self.workflow_time_plot = dpg.add_bar_series([], [], parent=dpg.last_item())
+
 
     def _setup_control_panel(self):
         """Setup workflow control panel"""
@@ -205,32 +269,51 @@ class AgentMonitoringSystem:
                     callback=self.stop_selected_workflow,
                 )
 
+    def _apply_updates(self, updates):
+        """Apply batched updates to the UI"""
+        with dpg.mutex():
+            for agent_name, data in updates.items():
+                if agent := self.agents.get(agent_name):
+                    self._update_agent_node(agent, data)
+
+    def _process_message_queue(self):
+        """Process pending messages from the queue"""
+        try:
+            # Process up to 10 messages per frame (prevent queue buildup)
+            for _ in range(10):
+                try:
+                    msg = self.message_queue.get_nowait()
+                    self.process_message(msg)  # Your existing process_message method
+                except queue.Empty:
+                    break
+                
+        except Exception as e:
+            self.logger.error(f"Error processing message queue: {e}")
+
     def run(self):
         """Main application loop"""
         try:
             self.logger.debug("Starting main loop")
             last_performance_update = time.time()
+            update_interval = 1.0  # Update every second
             
             while dpg.is_dearpygui_running():
                 try:
                     # Process messages
-                    while not self.message_queue.empty():
-                        msg = self.message_queue.get_nowait()
-                        self.process_message(msg)
+                    self._process_message_queue()
                     
-                    # Update performances every second
+                    # Process buffered updates only if there are changes
+                    if updates := self.update_buffer.process_updates():
+                        self._apply_updates(updates)
+                    
+                    # Update performances at a fixed interval
                     current_time = time.time()
-                    if current_time - last_performance_update >= 1.0:
+                    if current_time - last_performance_update >= update_interval:
                         self.update_agent_performances()
                         last_performance_update = current_time
                     
-                    # Update other metrics and UI
-                    self.update_metrics()
-                    
-                except queue.Empty:
-                    pass
                 except Exception as e:
-                    self.logger.error(f"Error in main loop: {str(e)}")
+                    self.logger.error(f"Error in main loop: {e}")
                 
                 dpg.render_dearpygui_frame()
                 
@@ -242,19 +325,16 @@ class AgentMonitoringSystem:
         """Update performance metrics for all agents"""
         for agent_name, agent in self.agents.items():
             try:
-                # Update CPU and memory usage (example values - replace with actual monitoring)
+                # Get performance data
                 agent.cpu_usage = psutil.cpu_percent(interval=0.1)
-                agent.memory_usage = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+                agent.memory_usage = psutil.Process().memory_info().rss / 1024 / 1024
                 
-                # Update performance history
-                if not hasattr(agent, 'performance_history'):
-                    agent.performance_history = [0.0] * 100
-                
-                # Add new value and maintain fixed length
-                agent.performance_history = agent.performance_history[1:] + [agent.cpu_usage]
-                
-                # Update the node
-                self._update_agent_node(agent)
+                # Add to buffer instead of immediate update
+                self.update_buffer.add_update(agent_name, {
+                    'cpu': agent.cpu_usage,
+                    'memory': agent.memory_usage,
+                    'status': agent.status
+                })
                 
             except Exception as e:
                 self.logger.error(f"Error updating agent {agent_name} performance: {e}")
@@ -267,47 +347,7 @@ class AgentMonitoringSystem:
                 logger.info(f"Stopped workflow {self.selected_workflow_id}")
             except Exception as e:
                 logger.error(f"Error stopping workflow: {e}")
-    
-    def _setup_status_panel(self):
-        """Setup system status panel"""
-        with dpg.collapsing_header(label="System Status", default_open=True):
-            dpg.add_text("Active Agents: 0", tag="active_agents_text")
-            dpg.add_text("Active Workflows: 0", tag="active_workflows_text")
-            dpg.add_text("Messages: 0", tag="messages_text")
-            dpg.add_text("Uptime: 00:00:00", tag="uptime_text")
 
-    def _setup_visualization_tabs(self):
-        """Setup visualization tabs"""
-        with dpg.tab_bar():
-            # Research Agents View
-            with dpg.tab(label="Research"):
-                with dpg.group():
-                    dpg.add_text("Research Agents Status")
-                    # Implement specialized views for research agents
-
-            # Code Agents View
-            with dpg.tab(label="Code"):
-                with dpg.group():
-                    dpg.add_text("Code Agents Status")
-                    # Implement specialized views for code agents
-
-            # Visualization Agents View
-            with dpg.tab(label="Visualization"):
-                with dpg.group():
-                    dpg.add_text("Visualization Agents Status")
-                    # Implement specialized views for visualization agents
-
-            # QA Agents View
-            with dpg.tab(label="QA"):
-                with dpg.group():
-                    dpg.add_text("QA Agents Status")
-                    # Implement specialized views for QA agents
-
-            # Project Management Agents View
-            with dpg.tab(label="PM"):
-                with dpg.group():
-                    dpg.add_text("Project Management Status")
-                    # Implement specialized views for PM agents
 
     def view_agent_details(self, sender, app_data):
         """Show detailed information about selected agent"""
@@ -413,114 +453,6 @@ Current Task: {agent.get('current_task', 'None')}"""
     def select_workflow_callback(self, sender, app_data, user_data):
         """Callback for when a workflow is selected in the UI"""
         self.selected_workflow_id = user_data
-        self.update_views()
-
-    def update_views(self):
-        """Update both graph and timeline views based on selected workflow"""
-        if self.selected_workflow_id and self.selected_workflow_id in self.workflows:
-            workflow = self.workflows[self.selected_workflow_id]
-            self.update_graph_view(workflow)
-            self.update_timeline_view(workflow)
-
-    def update_graph_view(self, workflow: Dict):
-        """Update the graph visualization of agent interactions"""
-        if not hasattr(self, 'graph_view'):
-            return
-
-        # Create a directed graph
-        G = nx.DiGraph()
-
-        # Add nodes for each agent
-        for agent in workflow['agents']:
-            G.add_node(agent['name'], role=agent['role'])
-
-        # Add edges for interactions
-        for interaction in workflow['interactions']:
-            G.add_edge(
-                interaction['from'],
-                interaction['to'],
-                timestamp=interaction['timestamp']
-            )
-
-        # Clear previous graph
-        dpg.delete_item(self.graph_view, children_only=True)
-
-        # Create layout
-        pos = nx.spring_layout(G)
-
-        # Draw nodes
-        for node in G.nodes():
-            x, y = pos[node]
-            dpg.draw_circle(
-                center=[x * 100 + 200, y * 100 + 200],
-                radius=20,
-                fill=[0, 255, 0, 255],
-                parent=self.graph_view
-            )
-            dpg.draw_text(
-                pos=[x * 100 + 180, y * 100 + 190],
-                text=node,
-                parent=self.graph_view
-            )
-
-        # Draw edges
-        for edge in G.edges():
-            start_pos = pos[edge[0]]
-            end_pos = pos[edge[1]]
-            dpg.draw_line(
-                p1=[start_pos[0] * 100 + 200, start_pos[1] * 100 + 200],
-                p2=[end_pos[0] * 100 + 200, end_pos[1] * 100 + 200],
-                color=[255, 255, 255, 255],
-                parent=self.graph_view
-            )
-
-    def update_timeline_view(self, workflow: Dict):
-        """Update the timeline visualization of agent activities"""
-        if not hasattr(self, 'timeline_view'):
-            return
-
-        # Clear previous timeline
-        dpg.delete_item(self.timeline_view, children_only=True)
-
-        # Sort interactions by timestamp
-        interactions = sorted(
-            workflow['interactions'],
-            key=lambda x: datetime.fromisoformat(x['timestamp'])
-        )
-
-        # Calculate timeline dimensions
-        timeline_start = datetime.fromisoformat(interactions[0]['timestamp'])
-        timeline_end = datetime.fromisoformat(interactions[-1]['timestamp'])
-        total_duration = (timeline_end - timeline_start).total_seconds()
-
-        # Draw timeline base
-        dpg.draw_line(
-            p1=[50, 250],
-            p2=[550, 250],
-            color=[255, 255, 255, 255],
-            parent=self.timeline_view
-        )
-
-        # Draw interactions on timeline
-        for idx, interaction in enumerate(interactions):
-            timestamp = datetime.fromisoformat(interaction['timestamp'])
-            position = (timestamp - timeline_start).total_seconds() / total_duration
-            x_pos = 50 + position * 500
-
-            # Draw marker
-            dpg.draw_circle(
-                center=[x_pos, 250],
-                radius=5,
-                fill=[0, 255, 0, 255],
-                parent=self.timeline_view
-            )
-
-            # Draw label
-            dpg.draw_text(
-                pos=[x_pos - 20, 260],
-                text=f"{interaction['from']} → {interaction['to']}",
-                parent=self.timeline_view
-            )
 
     def register_workflow(self, workflow_id: str, workflow_data: Dict):
         """Register a new workflow to be monitored"""
@@ -547,11 +479,6 @@ Current Task: {agent.get('current_task', 'None')}"""
         ):
             # Node editor will be populated dynamically
             pass
-            
-        # Add a tooltip to explain controls
-        # with dpg.tooltip(parent="agent_node_editor"):
-        #     dpg.add_text("Ctrl+Click to remove connections\nDrag nodes to reposition")
-
 
     def _add_agent_node(self, agent: AgentState):
         """Add a new agent node to the editor with proper styling and attributes"""
@@ -662,92 +589,57 @@ Current Task: {agent.get('current_task', 'None')}"""
             dpg.set_node_editor_panning(center_x, center_y)
 
     
-    def _update_agent_node(self, agent: AgentState):
-        """Update an existing agent node's information with enhanced error logging"""
+    def _update_agent_node(self, agent, data: dict):
+        """Update an agent node's UI with buffered data
+        
+        Args:
+            agent: The agent object
+            data: Dict containing:
+                {
+                    'cpu': float,  # CPU usage percentage
+                    'memory': float,  # Memory usage in MB
+                    'status': str,  # Agent status
+                    'current_task': str,  # Optional - current task description
+                    'performance_history': list  # Optional - for graphs
+                }
+        """
         try:
-            # Get all relevant item tags before updating
+            # Get all relevant item tags
             status_tag = f"status_text_{agent.name}"
             task_tag = f"task_text_{agent.name}"
             cpu_tag = f"cpu_text_{agent.name}"
             memory_tag = f"memory_text_{agent.name}"
             plot_tag = f"performance_plot_{agent.name}"
 
-            # Log the items we're trying to update
-            self.logger.debug(f"Updating node items for agent {agent.name}: "
-                            f"status={status_tag}, task={task_tag}, "
-                            f"cpu={cpu_tag}, memory={memory_tag}, plot={plot_tag}")
-
-            # Check if items exist before updating
-            for tag in [status_tag, task_tag, cpu_tag, memory_tag, plot_tag]:
-                if not dpg.does_item_exist(tag):
-                    self.logger.error(f"Item {tag} does not exist!")
-                    continue
-
-                try:
-                    # Status update
-                    if tag == status_tag:
-                        status_colors = {
-                            "active": [0, 255, 0, 255],
-                            "idle": [150, 150, 150, 255],
-                            "busy": [255, 165, 0, 255],
-                            "error": [255, 0, 0, 255]
-                        }
-                        dpg.configure_item(
-                            tag,
-                            default_value=agent.status,
-                            color=status_colors.get(agent.status.lower(), [255, 255, 255, 255])
-                        )
-                        self.logger.debug(f"Updated status for {agent.name}: {agent.status}")
-
-                    # Task update
-                    elif tag == task_tag:
-                        dpg.configure_item(
-                            tag,
-                            default_value=agent.current_task or "None"
-                        )
-                        self.logger.debug(f"Updated task for {agent.name}: {agent.current_task}")
-
-                    # CPU update
-                    elif tag == cpu_tag:
-                        dpg.configure_item(
-                            tag,
-                            default_value=f"{agent.cpu_usage:.1f}%"
-                        )
-                        self.logger.debug(f"Updated CPU for {agent.name}: {agent.cpu_usage:.1f}%")
-
-                    # Memory update
-                    elif tag == memory_tag:
-                        dpg.configure_item(
-                            tag,
-                            default_value=f"{agent.memory_usage:.1f}MB"
-                        )
-                        self.logger.debug(f"Updated memory for {agent.name}: {agent.memory_usage:.1f}MB")
-
-                    # Performance plot update
-                    elif tag == plot_tag and hasattr(agent, 'performance_history'):
-                        dpg.configure_item(
-                            tag,
-                            default_value=agent.performance_history
-                        )
-                        self.logger.debug(f"Updated performance plot for {agent.name}")
-
-                except Exception as item_error:
-                    # Get DPG's last error
-                    self.logger.error(f"Error updating {tag} for agent {agent.name}:")
-                    self.logger.error(f"Exception: {str(item_error)}")
-                    if hasattr(item_error, '__traceback__'):
-                        import traceback
-                        self.logger.error("Traceback:")
-                        self.logger.error(traceback.format_tb(item_error.__traceback__))
-
+            # Update only if values have changed
+            if 'cpu' in data and dpg.does_item_exist(cpu_tag):
+                dpg.set_value(cpu_tag, f"{data['cpu']:.1f}%")
+                
+            if 'memory' in data and dpg.does_item_exist(memory_tag):
+                dpg.set_value(memory_tag, f"{data['memory']:.1f}MB")
+                
+            if 'status' in data and dpg.does_item_exist(status_tag):
+                status_colors = {
+                    "active": [0, 255, 0, 255],    # Green
+                    "idle": [150, 150, 150, 255],  # Gray
+                    "busy": [255, 165, 0, 255],    # Orange
+                    "error": [255, 0, 0, 255]      # Red
+                }
+                dpg.configure_item(
+                    status_tag,
+                    default_value=data['status'],
+                    color=status_colors.get(data['status'].lower(), [255, 255, 255, 255])
+                )
+                
+            if 'current_task' in data and dpg.does_item_exist(task_tag):
+                dpg.set_value(task_tag, data['current_task'] or "None")
+                
+            # Update performance plot if available
+            if 'performance_history' in data and dpg.does_item_exist(plot_tag):
+                dpg.configure_item(plot_tag, default_value=data['performance_history'])
+                
         except Exception as e:
-            # Get DPG's last error
-            self.logger.error(f"Critical error updating agent node {agent.name}:")
-            self.logger.error(f"Exception: {str(e)}")
-            if hasattr(e, '__traceback__'):
-                import traceback
-                self.logger.error("Traceback:")
-                self.logger.error(traceback.format_tb(e.__traceback__))
+            self.logger.error(f"Error updating node {agent.name}: {e}")
 
     def setup_logging(self):
         """Setup enhanced logging configuration"""
@@ -856,78 +748,10 @@ Current Task: {agent.get('current_task', 'None')}"""
         except Exception as e:
             logger.error(f"Error handling node disconnection: {e}")
 
-    def _auto_layout_nodes(self):
-        """Automatically arrange nodes in a force-directed layout"""
-        try:
-            if not self.selected_workflow_id:
-                return
-                
-            workflow = self.workflows.get(self.selected_workflow_id)
-            if not workflow:
-                return
-            
-            # Create networkx graph from connections
-            G = nx.Graph()
-            
-            # Add nodes
-            for agent in workflow['agents']:
-                G.add_node(agent['id'])
-            
-            # Add edges
-            for conn in workflow['connections']:
-                G.add_edge(conn['from'], conn['to'])
-            
-            # Calculate layout
-            pos = nx.spring_layout(G)
-            
-            # Scale and translate positions to fit in the node editor
-            editor_width = dpg.get_item_width("agent_node_editor")
-            editor_height = dpg.get_item_height("agent_node_editor")
-            margin = 50
-            
-            for node_id, position in pos.items():
-                x = (position[0] + 1) * (editor_width - 2*margin)/2 + margin
-                y = (position[1] + 1) * (editor_height - 2*margin)/2 + margin
-                dpg.set_item_pos(f"node_{node_id}", [x, y])
-            
-        except Exception as e:
-            logger.error(f"Error in auto-layout: {e}")
-
     def _add_node_context_menu(self):
         """Add context menu for nodes"""
         with dpg.handler_registry():
             dpg.add_item_clicked_handler(callback=self._show_node_context_menu, button=dpg.mvMouseButton_Right)
-
-    def _show_node_context_menu(self, sender, app_data, user_data):
-        """Show context menu for node interactions"""
-        if dpg.does_item_exist("node_context_menu"):
-            dpg.delete_item("node_context_menu")
-        
-        # Get clicked node
-        clicked_node = dpg.get_item_info(sender)["parent"]
-        if not clicked_node.startswith("node_"):
-            return
-            
-        node_id = clicked_node.split("_")[1]
-        
-        # Create context menu
-        with dpg.window(label="Node Menu", tag="node_context_menu", popup=True):
-            dpg.add_text(f"Node: {node_id}")
-            dpg.add_separator()
-            
-            # Add menu items
-            dpg.add_menu_item(
-                label="View Details",
-                callback=lambda: self.view_agent_details(node_id)
-            )
-            dpg.add_menu_item(
-                label="Reset Position",
-                callback=lambda: dpg.reset_pos(clicked_node)
-            )
-            dpg.add_menu_item(
-                label="Remove Node",
-                callback=lambda: self._remove_agent_node(node_id)
-            )
 
     def _remove_agent_node(self, agent_id: str):
         """Remove an agent node from the editor"""
@@ -959,21 +783,40 @@ Current Task: {agent.get('current_task', 'None')}"""
             
 
     def _setup_message_log(self):
-        """Setup the message log panel"""
+        """Setup the message logging panel with filtering and search"""
         with dpg.child_window(label="Message Log", height=-1):
-            # Add message filter controls
             with dpg.group(horizontal=True):
-                dpg.add_combo(
-                    label="Filter",
-                    items=["All", "Info", "Warning", "Error"],
-                    default_value="All",
-                    callback=self._filter_messages,
-                    tag="message_filter"
-                )
+                # Message filtering controls
+                dpg.add_checkbox(label="Info", default_value=True, callback=self._filter_messages)
+                dpg.add_checkbox(label="Warning", default_value=True, callback=self._filter_messages)
+                dpg.add_checkbox(label="Error", default_value=True, callback=self._filter_messages)
                 dpg.add_button(label="Clear", callback=self._clear_messages)
-            
+                
+                dpg.add_spacer(width=20)
+                # Search box
+                dpg.add_input_text(label="Search", callback=self._filter_messages, width=200)
+
             # Message log container
-            dpg.add_child_window(tag="message_list", height=-1)
+            # Message log container
+            with dpg.child_window(height=-1, width=-1, tag="message_log_window"):
+                # Add table to the window
+                with dpg.table(
+                    header_row=True,
+                    borders_innerH=True,
+                    borders_outerH=True,
+                    borders_innerV=True,
+                    borders_outerV=True,
+                    resizable=True,
+                    policy=dpg.mvTable_SizingStretchProp,
+                    tag="message_log_table"
+                ) as message_table:
+
+                    # Add table columns with message_table as the parent
+                    dpg.add_table_column(label="Time", width_fixed=True, init_width_or_weight=80)
+                    dpg.add_table_column(label="Level", width_fixed=True, init_width_or_weight=70)
+                    dpg.add_table_column(label="Source", width_fixed=True, init_width_or_weight=100)
+                    dpg.add_table_column(label="Message")
+
 
     def _setup_agent_list(self):
         """Enhanced agent list setup with type information"""
@@ -1156,12 +999,38 @@ Current Task: {agent.get('current_task', 'None')}"""
         }
         return colors.get(level, (255, 255, 255))
 
+    def _add_message(self, level: str, source: str, message: str):
+        """Add a message to the log with proper formatting"""
+        with dpg.table_row(parent=self.message_list):
+            time_str = datetime.now().strftime("%H:%M:%S")
+            dpg.add_text(time_str)
+            
+            # Color-coded level indicator
+            level_colors = {
+                "INFO": [255, 255, 255],
+                "WARNING": [255, 255, 0],
+                "ERROR": [255, 0, 0]
+            }
+            dpg.add_text(level, color=level_colors.get(level.upper(), [255, 255, 255]))
+            dpg.add_text(source)
+            dpg.add_text(message)
+
+    def _filter_messages(self, sender=None, filter_text=None):
+        """Filter messages based on level and search text"""
+        filter_text = dpg.get_value("message_search") if filter_text is None else filter_text
+        show_info = dpg.get_value("show_info")
+        show_warning = dpg.get_value("show_warning")
+        show_error = dpg.get_value("show_error")
+        
+        # Clear and repopulate the message list based on filters
+        dpg.delete_item(self.message_list, children_only=True)
+        
+        for msg in self.message_history:
+            if not self._should_show_message(msg, show_info, show_warning, show_error, filter_text):
+                continue
+            self._add_message(msg["level"], msg["source"], msg["message"])
+
     def _clear_messages(self):
         """Clear all messages from the log"""
-        if dpg.does_item_exist("message_list"):
-            dpg.delete_item("message_list", children_only=True)
-
-    def _filter_messages(self, sender, app_data):
-        """Filter messages based on level"""
-        # To be implemented when we add message storage
-        pass
+        self.message_history.clear()
+        dpg.delete_item(self.message_list, children_only=True)
