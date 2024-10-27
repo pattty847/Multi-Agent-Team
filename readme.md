@@ -3,6 +3,8 @@
 
 This project is a multi-agent system designed to assist with coding, analysis, and research tasks. It leverages AI to interact with users, execute code, and perform web searches for research papers. The system now includes an intuitive drag-and-drop interface for designing workflows and monitoring their progress in real-time.
 
+Special thanks to GPT and Claude <3
+
 ## Table of Contents
 
 - [Overview](#overview)
