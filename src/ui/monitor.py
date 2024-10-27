@@ -279,40 +279,46 @@ class AgentMonitoringSystem:
     def _setup_visualization_tabs(self):
         """Setup visualization tabs"""
         with dpg.tab_bar():
-            # Workflow Graph Tab
-            with dpg.tab(label="Workflow Graph"):
-                self.graph_view = dpg.add_drawlist(
-                    width=-1, 
-                    height=int(self.height * 0.7)
-                )
-            
-            # Message Log Tab
-            with dpg.tab(label="Message Log"):
-                self.message_log = dpg.add_child_window(
-                    width=-1,
-                    height=int(self.height * 0.7)
-                )
-                # Add a clear button for the log
-                dpg.add_button(
-                    label="Clear Log",
-                    callback=lambda: dpg.delete_item(self.message_log, children_only=True),
-                    parent=self.message_log
-                )
-            
-            # Metrics Tab
-            with dpg.tab(label="Metrics"):
-                self._setup_metrics_plot()
+            # Research Agents View
+            with dpg.tab(label="Research"):
+                with dpg.group():
+                    dpg.add_text("Research Agents Status")
+                    # Implement specialized views for research agents
+
+            # Code Agents View
+            with dpg.tab(label="Code"):
+                with dpg.group():
+                    dpg.add_text("Code Agents Status")
+                    # Implement specialized views for code agents
+
+            # Visualization Agents View
+            with dpg.tab(label="Visualization"):
+                with dpg.group():
+                    dpg.add_text("Visualization Agents Status")
+                    # Implement specialized views for visualization agents
+
+            # QA Agents View
+            with dpg.tab(label="QA"):
+                with dpg.group():
+                    dpg.add_text("QA Agents Status")
+                    # Implement specialized views for QA agents
+
+            # Project Management Agents View
+            with dpg.tab(label="PM"):
+                with dpg.group():
+                    dpg.add_text("Project Management Status")
+                    # Implement specialized views for PM agents
 
     def view_agent_details(self, sender, app_data):
         """Show detailed information about selected agent"""
         agent_name = dpg.get_value("agent_list")
         if not agent_name:
             return
-            
+
         agent = self.agents.get(agent_name)
         if not agent:
             return
-        
+
         # Create or configure the details window
         if not dpg.does_item_exist("agent_details_window"):
             with dpg.window(
@@ -324,14 +330,14 @@ class AgentMonitoringSystem:
                 show=True
             ):
                 dpg.add_text("", tag="agent_details_text")
-        
+
         # Update details text
         details = f"""Name: {agent.get('name', 'N/A')}
-        Status: {agent.get('status', 'N/A')}
-        Role: {agent.get('role', 'N/A')}
-        Tasks Completed: {len(agent.get('tasks', []))}
-        Current Task: {agent.get('current_task', 'None')}"""
-            
+Status: {agent.get('status', 'N/A')}
+Role: {agent.get('role', 'N/A')}
+Tasks Completed: {len(agent.get('tasks', []))}
+Current Task: {agent.get('current_task', 'None')}"""
+
         dpg.configure_item("agent_details_text", default_value=details)
         dpg.show_item("agent_details_window")
 
@@ -343,14 +349,14 @@ class AgentMonitoringSystem:
             # Update UI elements for selected agent
 
     def update_metrics(self):
-        """Update UI metrics - safe to call from render loop"""
+        """Update UI metrics"""
         if dpg.does_alias_exist("active_agents_text"):
             dpg.set_value("active_agents_text", f"Active Agents: {len(self.agents)}")
             dpg.set_value("active_workflows_text", f"Active Workflows: {self.metrics['active_workflows']}")
             dpg.set_value("messages_text", f"Messages: {self.metrics['messages_processed']}")
 
     def update_graph(self):
-        """Update the workflow graph visualization - safe to call from render loop"""
+        """Update the workflow graph visualization"""
         if not self.selected_workflow_id:
             return
 
@@ -360,17 +366,17 @@ class AgentMonitoringSystem:
 
         # Clear previous graph
         dpg.delete_item(self.graph_view, children_only=True)
-        
+
         # Draw nodes and edges
         node_positions = {}
         for agent in workflow['agents']:
             x = len(node_positions) * 100 + 50
             y = 200
             node_positions[agent['name']] = (x, y)
-            
+
             # Draw node
             dpg.draw_circle((x, y), 20, parent=self.graph_view, fill=(0, 255, 0, 100))
-            dpg.draw_text((x-30, y+25), agent['name'], parent=self.graph_view)
+            dpg.draw_text((x - 30, y + 25), agent['name'], parent=self.graph_view)
 
         # Draw edges for interactions
         for interaction in workflow['interactions']:
@@ -380,30 +386,30 @@ class AgentMonitoringSystem:
                 dpg.draw_line(start, end, parent=self.graph_view, color=(255, 255, 255, 100))
 
     def process_message(self, message: Dict):
-        """Process incoming messages - safe to call from render loop"""
+        """Process incoming messages"""
         msg_type = message.get('type')
-        
+
         if msg_type == 'new_agent':
             self.agents[message['agent_id']] = message['data']
-            
+
         elif msg_type == 'agent_update':
             if message['agent_id'] in self.agents:
                 self.agents[message['agent_id']].update(message['data'])
-                
+
         elif msg_type == 'new_workflow':
             self.workflows[message['workflow_id']] = message['data']
             self.metrics['active_workflows'] += 1
-            
+
         elif msg_type == 'workflow_update':
             if message['workflow_id'] in self.workflows:
                 self.workflows[message['workflow_id']].update(message['data'])
-                
+
         elif msg_type == 'message':
             self.metrics['messages_processed'] += 1
 
         # Update UI elements
         dpg.configure_item("agent_list", items=list(self.agents.keys()))
-        
+
     def select_workflow_callback(self, sender, app_data, user_data):
         """Callback for when a workflow is selected in the UI"""
         self.selected_workflow_id = user_data
@@ -411,19 +417,19 @@ class AgentMonitoringSystem:
 
     def update_views(self):
         """Update both graph and timeline views based on selected workflow"""
-        if self.selected_workflow_id and self.selected_workflow_id in self.active_workflows:
-            workflow = self.active_workflows[self.selected_workflow_id]
+        if self.selected_workflow_id and self.selected_workflow_id in self.workflows:
+            workflow = self.workflows[self.selected_workflow_id]
             self.update_graph_view(workflow)
             self.update_timeline_view(workflow)
 
     def update_graph_view(self, workflow: Dict):
         """Update the graph visualization of agent interactions"""
-        if not self.graph_view_id:
+        if not hasattr(self, 'graph_view'):
             return
 
         # Create a directed graph
         G = nx.DiGraph()
-        
+
         # Add nodes for each agent
         for agent in workflow['agents']:
             G.add_node(agent['name'], role=agent['role'])
@@ -437,11 +443,11 @@ class AgentMonitoringSystem:
             )
 
         # Clear previous graph
-        dpg.delete_item(self.graph_view_id, children_only=True)
+        dpg.delete_item(self.graph_view, children_only=True)
 
         # Create layout
         pos = nx.spring_layout(G)
-        
+
         # Draw nodes
         for node in G.nodes():
             x, y = pos[node]
@@ -449,12 +455,12 @@ class AgentMonitoringSystem:
                 center=[x * 100 + 200, y * 100 + 200],
                 radius=20,
                 fill=[0, 255, 0, 255],
-                parent=self.graph_view_id
+                parent=self.graph_view
             )
             dpg.draw_text(
                 pos=[x * 100 + 180, y * 100 + 190],
                 text=node,
-                parent=self.graph_view_id
+                parent=self.graph_view
             )
 
         # Draw edges
@@ -465,16 +471,16 @@ class AgentMonitoringSystem:
                 p1=[start_pos[0] * 100 + 200, start_pos[1] * 100 + 200],
                 p2=[end_pos[0] * 100 + 200, end_pos[1] * 100 + 200],
                 color=[255, 255, 255, 255],
-                parent=self.graph_view_id
+                parent=self.graph_view
             )
 
     def update_timeline_view(self, workflow: Dict):
         """Update the timeline visualization of agent activities"""
-        if not self.timeline_view_id:
+        if not hasattr(self, 'timeline_view'):
             return
 
         # Clear previous timeline
-        dpg.delete_item(self.timeline_view_id, children_only=True)
+        dpg.delete_item(self.timeline_view, children_only=True)
 
         # Sort interactions by timestamp
         interactions = sorted(
@@ -492,7 +498,7 @@ class AgentMonitoringSystem:
             p1=[50, 250],
             p2=[550, 250],
             color=[255, 255, 255, 255],
-            parent=self.timeline_view_id
+            parent=self.timeline_view
         )
 
         # Draw interactions on timeline
@@ -506,27 +512,27 @@ class AgentMonitoringSystem:
                 center=[x_pos, 250],
                 radius=5,
                 fill=[0, 255, 0, 255],
-                parent=self.timeline_view_id
+                parent=self.timeline_view
             )
 
             # Draw label
             dpg.draw_text(
                 pos=[x_pos - 20, 260],
                 text=f"{interaction['from']} → {interaction['to']}",
-                parent=self.timeline_view_id
+                parent=self.timeline_view
             )
 
     def register_workflow(self, workflow_id: str, workflow_data: Dict):
         """Register a new workflow to be monitored"""
-        self.active_workflows[workflow_id] = workflow_data
+        self.workflows[workflow_id] = workflow_data
         if not self.selected_workflow_id:
             self.selected_workflow_id = workflow_id
             self.update_views()
 
     def update_workflow(self, workflow_id: str, workflow_data: Dict):
         """Update an existing workflow's data"""
-        if workflow_id in self.active_workflows:
-            self.active_workflows[workflow_id] = workflow_data
+        if workflow_id in self.workflows:
+            self.workflows[workflow_id] = workflow_data
             if workflow_id == self.selected_workflow_id:
                 self.update_views()
                 

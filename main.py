@@ -1,28 +1,7 @@
 # main.py
-
 import dearpygui.dearpygui as dpg
-import tkinter as tk
-from src.ui.monitor import AgentMonitoringSystem
 from src.core.config import SystemConfig
-
-
-def get_screen_size_percentage(percentage=0.80):
-    # Create a root window and hide it
-    root = tk.Tk()
-    root.withdraw()
-
-    # Get the screen width and height
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-
-    # Calculate the width and height based on the percentage
-    width = int(screen_width * percentage)
-    height = int(screen_height * percentage)
-
-    # Destroy the root window
-    root.destroy()
-
-    return width, height
+from src.ui.monitor import AgentMonitoringSystem
 
 def main():
     # Create DPG context first
@@ -31,17 +10,9 @@ def main():
     try:
         # Initialize system
         config = SystemConfig()
+        
+        # Create and run monitor with workflow management
         monitor = AgentMonitoringSystem(config)
-        width, height = get_screen_size_percentage()
-        
-        # Create viewport (moved from setup_ui)
-        dpg.create_viewport(
-            title="Agent Monitoring System",
-            width=width,
-            height=height
-        )
-        
-        # Setup UI elements
         monitor.setup_ui()
         
         # Setup DPG

@@ -1,0 +1,3018 @@
+Project Export - Multi-Agent-Team
+Generated on: 2024-10-25 16:30:55
+==================================================
+
+📁 .
+    📄 project_export.txt
+        File Contents:
+        ==================================================
+        ==================================================
+
+    📄 readme.md
+        File Contents:
+        ==================================================
+        # Multi-Agent System Project
+        
+        This project is a multi-agent system designed to assist with coding, analysis, and research tasks. It leverages AI to interact with users, execute code, and perform web searches for research papers.
+        
+        ## Table of Contents
+        
+        - [Overview](#overview)
+        - [Project Structure](#project-structure)
+        - [Setup](#setup)
+        - [Usage](#usage)
+        - [Contributing](#contributing)
+        - [License](#license)
+        
+        ## Overview
+        
+        The multi-agent system is built using Python and Docker. It includes components for web searching, code execution, and user interaction through a conversational interface. The system is designed to be extensible, allowing for the integration of additional tools and functionalities.
+        
+        ## High-level overview:
+        
+        1. Core Differentiators:
+        ```python
+        class UnifiedTeamOrchestrator:
+            """Combines:
+            - Real-world management principles
+            - Advanced task decomposition
+            - Dynamic role assignment 
+            - Real-time monitoring
+            - Visual workflow tracking
+            """
+        ```
+        
+        2. Key Innovations:
+        - Fact-based planning: Uses verified facts, facts to look up, and educated guesses
+        - Business-inspired workflow: Based on real management experience
+        - Visual monitoring: Real-time tracking and visualization
+        - Stall detection: Identifies and handles blocked progress
+        - Role optimization: Matches agent capabilities to tasks
+        
+        3. Architecture Flow:
+        ```mermaid
+        graph TD
+            A[Initial Task] --> B[Fact Gathering]
+            B --> C[Task Planning]
+            C --> D[Role Assignment]
+            D --> E[Execution]
+            E --> F[Monitoring]
+            F -->|Success| G[Complete]
+            F -->|Stalled| H[Replan]
+            H --> B
+        ```
+        
+        4. What Sets Us Apart:
+        - Business-driven design vs purely academic approaches
+        - Real-time visualization vs black box execution
+        - Practical management principles vs theoretical frameworks
+        - Focus on tracking and improvement vs just task completion
+        
+        
+        ## Project Structure
+        
+        - **src/**: Contains the main source code for the agents, configuration, and execution logic.
+        - **tools/**: Utilities for web searching and directory structure printing.
+        - **scripts/**: Batch scripts for setting up and managing the Docker environment.
+        - **docker/**: Docker configuration files for building and running the system.
+        
+        ## Setup
+        
+        To set up the project, follow these steps:
+        
+        1. **Clone the Repository**:
+           ```bash
+           git clone https://github.com/pattty847/Multi-Agent-Team.git
+           cd Multi-Agent-Team
+           ```
+        
+        2. **Create a Virtual Environment**:
+           ```bash
+           python -m venv .venv
+           source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+           ```
+        
+        3. **Install Dependencies**:
+           ```bash
+           pip install -r requirements.txt
+           ```
+        
+        4. **Run Setup Script**:
+           Execute the setup script to build and start the Docker containers.
+           ```bash
+           scripts/setup.bat
+           ```
+        
+        ## Usage
+        
+        1. **Access Jupyter Lab**:
+           Use the Jupyter script to launch Jupyter Lab for interactive development.
+           ```bash
+           scripts/jupyter.bat
+           ```
+        
+        2. **Run Tasks**:
+           The system can perform tasks such as web searches and code execution through the agents.
+        
+        3. **Stop the System**:
+           Use the stop script to stop the Docker containers when done.
+           ```bash
+           scripts/stop.bat
+           ```
+        
+        ## Contributing
+        
+        Contributions are welcome! Please fork the repository and submit a pull request with your changes. Ensure that your code adheres to the project's coding standards and includes appropriate tests.
+        
+        ## License
+        
+        This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.        ==================================================
+
+    📄 requirements.txt
+        File Contents:
+        ==================================================
+        autogen-agentchat==0.2.37
+        beautifulsoup4==4.12.2
+        requests==2.31.0
+        python-dotenv==1.0.0
+        jupyter==1.0.0
+        jupyterlab==4.0.11
+        lxml==5.0.1
+        fake-useragent==1.4.0
+        flaml[automl]        ==================================================
+
+    📄 start.py
+        File Contents:
+        ==================================================
+        # start.py
+        import sys
+        import atexit
+        from src.config import SystemConfig
+        from src.executor import EnhancedDockerExecutor
+        from src.agents import TeamManager
+        from src.task_decomposition import decompose_and_execute
+        
+        def cleanup(executor):
+            """Ensure cleanup happens exactly once"""
+            if hasattr(cleanup, 'done'):
+                return
+            try:
+                executor.stop()
+                print("\nCleaned up resources.")
+            except Exception as e:
+                print(f"\nError during cleanup: {str(e)}")
+            finally:
+                cleanup.done = True
+        
+        def main():
+            # Initialize configuration
+            config = SystemConfig()
+            executor = None
+            
+            try:
+                # Create executor
+                executor = EnhancedDockerExecutor(
+                    image=config.DOCKER_IMAGE,
+                    timeout=config.CODE_TIMEOUT,
+                    workspace=config.WORKING_DIR
+                )
+                
+                # Register cleanup
+                atexit.register(cleanup, executor)
+                
+                # Create team manager
+                team_manager = TeamManager(config, executor)
+                
+                # Example complex task
+                task = """Create a comprehensive analysis of recent AI developments:
+                1. Research recent AI papers and breakthroughs
+                2. Analyze their potential impact
+                3. Create visualizations of key findings
+                4. Implement code examples
+                5. Ensure quality and accuracy
+                """
+                
+                # Decompose and execute the task
+                results = decompose_and_execute(task, config, team_manager)
+                
+                # Print results
+                print("\nTask Completion Summary:")
+                print("=" * 50)
+                for task_id, result in results.items():
+                    print(f"\nTask {task_id}:")
+                    print("-" * 20)
+                    print(result)
+                
+            except KeyboardInterrupt:
+                print("\nTerminated by user.")
+                sys.exit(0)
+            except Exception as e:
+                print(f"\nAn error occurred: {str(e)}")
+                sys.exit(1)
+        
+        if __name__ == "__main__":
+            main()        ==================================================
+
+    📄 ui_testing_start.py
+        File Contents:
+        ==================================================
+        import dearpygui.dearpygui as dpg
+        from typing import Dict, List, Optional
+        import queue
+        import tkinter as tk
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        class AgentMonitor:
+            def __init__(self):
+                self.message_queue = queue.Queue()
+                self.agents: Dict[str, Dict] = {}
+                self.workflows: Dict[str, Dict] = {}
+                self.selected_workflow_id: Optional[str] = None
+                
+                # Performance metrics
+                self.metrics = {
+                    "messages_processed": 0,
+                    "active_workflows": 0,
+                    "tasks_completed": 0
+                }
+        
+                root = tk.Tk()
+                screen_width = root.winfo_screenwidth()
+                screen_height = root.winfo_screenheight()
+                root.destroy()  # Close the tkinter window
+        
+                # Calculate viewport dimensions as 80% of screen size
+                self.viewport_width = int(screen_width * 0.8)
+                self.viewport_height = int(screen_height * 0.8)
+        
+                # Create context
+                dpg.create_context()
+        
+            def setup_ui(self):
+                """Initialize the monitoring UI components"""
+                # Create viewport
+                dpg.create_viewport(title="Agent Monitoring System", width=self.viewport_width, height=self.viewport_height)
+                
+                with dpg.window(label="Agent Monitor", tag="primary_window"):
+                    with dpg.group(horizontal=True):
+                        # Left panel - Controls and Status
+                        with dpg.child_window(width=300, height=-1):
+                            with dpg.collapsing_header(label="System Status", default_open=True):
+                                dpg.add_text("Active Agents:", tag="active_agents_text")
+                                dpg.add_text("Active Workflows:", tag="active_workflows_text")
+                                dpg.add_text("Messages Processed:", tag="messages_text")
+                            
+                            with dpg.collapsing_header(label="Workflow Control", default_open=True):
+                                dpg.add_button(label="Start New Workflow", callback=self.start_new_workflow)
+                                dpg.add_button(label="Stop Selected", callback=self.stop_selected_workflow)
+                                
+                            with dpg.collapsing_header(label="Agent List", default_open=True):
+                                self.agent_list = dpg.add_listbox(
+                                    tag="agent_list",
+                                    items=[],
+                                    num_items=10,
+                                    callback=self.select_agent
+                                )
+        
+                        # Right panel - Visualizations
+                        with dpg.child_window(width=900, height=-1):
+                            with dpg.tab_bar():
+                                with dpg.tab(label="Workflow Graph"):
+                                    self.graph_view = dpg.add_drawlist(width=880, height=400)
+                                    
+                                with dpg.tab(label="Message Log"):
+                                    self.message_log = dpg.add_child_window(width=880, height=400)
+                                    
+                                with dpg.tab(label="Metrics"):
+                                    with dpg.plot(label="Activity Over Time", height=400):
+                                        dpg.add_plot_legend()
+                                        dpg.add_plot_axis(dpg.mvXAxis, label="Time")
+                                        self.x_axis = dpg.last_item()
+                                        dpg.add_plot_axis(dpg.mvYAxis, label="Count")
+                                        self.y_axis = dpg.last_item()
+                                        
+                                        self.message_series = dpg.add_line_series(
+                                            [], [], label="Messages",
+                                            parent=self.y_axis
+                                        )
+        
+                # Set primary window and show viewport
+                dpg.set_primary_window("primary_window", True)
+        
+            def start_new_workflow(self, sender, app_data):
+                """Start a new agent workflow"""
+                logger.info("Starting new workflow")
+                # Implementation here - safe to call from UI thread
+        
+            def stop_selected_workflow(self, sender, app_data):
+                """Stop the currently selected workflow"""
+                if self.selected_workflow_id:
+                    logger.info(f"Stopping workflow {self.selected_workflow_id}")
+                    # Implementation here - safe to call from UI thread
+        
+            def select_agent(self, sender, app_data):
+                """Handle agent selection from the list"""
+                selected_agent = self.agents.get(app_data)
+                if selected_agent:
+                    logger.info(f"Selected agent: {app_data}")
+                    # Update UI elements for selected agent
+        
+            def update_metrics(self):
+                """Update UI metrics - safe to call from render loop"""
+                dpg.set_value("active_agents_text", f"Active Agents: {len(self.agents)}")
+                dpg.set_value("active_workflows_text", f"Active Workflows: {self.metrics['active_workflows']}")
+                dpg.set_value("messages_text", f"Messages: {self.metrics['messages_processed']}")
+        
+            def update_graph(self):
+                """Update the workflow graph visualization - safe to call from render loop"""
+                if not self.selected_workflow_id:
+                    return
+        
+                workflow = self.workflows.get(self.selected_workflow_id)
+                if not workflow:
+                    return
+        
+                # Clear previous graph
+                dpg.delete_item(self.graph_view, children_only=True)
+                
+                # Draw nodes and edges
+                node_positions = {}
+                for agent in workflow['agents']:
+                    x = len(node_positions) * 100 + 50
+                    y = 200
+                    node_positions[agent['name']] = (x, y)
+                    
+                    # Draw node
+                    dpg.draw_circle((x, y), 20, parent=self.graph_view, fill=(0, 255, 0, 100))
+                    dpg.draw_text((x-30, y+25), agent['name'], parent=self.graph_view)
+        
+                # Draw edges for interactions
+                for interaction in workflow['interactions']:
+                    if interaction['from'] in node_positions and interaction['to'] in node_positions:
+                        start = node_positions[interaction['from']]
+                        end = node_positions[interaction['to']]
+                        dpg.draw_line(start, end, parent=self.graph_view, color=(255, 255, 255, 100))
+        
+            def process_message(self, message: Dict):
+                """Process incoming messages - safe to call from render loop"""
+                msg_type = message.get('type')
+                
+                if msg_type == 'new_agent':
+                    self.agents[message['agent_id']] = message['data']
+                    
+                elif msg_type == 'agent_update':
+                    if message['agent_id'] in self.agents:
+                        self.agents[message['agent_id']].update(message['data'])
+                        
+                elif msg_type == 'new_workflow':
+                    self.workflows[message['workflow_id']] = message['data']
+                    self.metrics['active_workflows'] += 1
+                    
+                elif msg_type == 'workflow_update':
+                    if message['workflow_id'] in self.workflows:
+                        self.workflows[message['workflow_id']].update(message['data'])
+                        
+                elif msg_type == 'message':
+                    self.metrics['messages_processed'] += 1
+        
+                # Update UI elements
+                dpg.configure_item("agent_list", items=list(self.agents.keys()))
+        
+            def run(self):
+                """Main application loop using DearPyGui's render loop"""
+                # Setup and show viewport
+                dpg.setup_dearpygui()
+                dpg.show_viewport()
+        
+                # Main loop
+                while dpg.is_dearpygui_running():
+                    # Process any messages in queue
+                    try:
+                        while not self.message_queue.empty():
+                            msg = self.message_queue.get_nowait()
+                            self.process_message(msg)
+                    except queue.Empty:
+                        pass
+        
+                    # Update UI
+                    self.update_metrics()
+                    self.update_graph()
+                    
+                    # Render frame
+                    dpg.render_dearpygui_frame()
+        
+                # Cleanup
+                dpg.destroy_context()
+        
+        def main():
+            logging.basicConfig(level=logging.INFO)
+            
+            try:
+                # Create monitor instance
+                monitor = AgentMonitor()
+                monitor.setup_ui()
+        
+                # Add some test data
+                monitor.message_queue.put({
+                    "type": "new_agent",
+                    "agent_id": "researcher_1",
+                    "data": {
+                        "name": "Researcher",
+                        "status": "active",
+                        "tasks": []
+                    }
+                })
+        
+                # Add another test agent
+                monitor.message_queue.put({
+                    "type": "new_agent", 
+                    "agent_id": "analyst_1",
+                    "data": {
+                        "name": "Analyst",
+                        "status": "idle",
+                        "tasks": []
+                    }
+                })
+        
+                # Start the monitor
+                monitor.run()
+        
+            except Exception as e:
+                logger.error(f"Application error: {e}")
+                raise
+        
+        if __name__ == "__main__":
+            main()        ==================================================
+
+    📁 tools
+        📄 extract_docs.py
+            File Contents:
+            ==================================================
+            import requests
+            from bs4 import BeautifulSoup
+            
+            # Base URLs
+            base_url = "https://dearpygui.readthedocs.io/en/latest/"
+            source_url = "https://dearpygui.readthedocs.io/en/latest/_sources/"
+            
+            # Function to fetch the raw .rst.txt content
+            def fetch_rst_text(url):
+                response = requests.get(url)
+                if response.status_code == 200:
+                    return response.text
+                else:
+                    return ""
+            
+            # Function to extract all the hrefs from the base index page
+            def get_all_rst_links(base_url):
+                page = requests.get(base_url)
+                soup = BeautifulSoup(page.content, "html.parser")
+                links = []
+                for link in soup.find_all('a'):
+                    href = link.get('href')
+                    if href and href.endswith('.html'):
+                        # Modify the URL to point to the .rst.txt file
+                        rst_txt_link = href.replace('.html', '.rst.txt')
+                        links.append(source_url + rst_txt_link)
+                return links
+            
+            # Gather all links
+            rst_links = get_all_rst_links(base_url)
+            
+            # Gather all documentation content
+            full_documentation = ""
+            for link in rst_links:
+                full_documentation += fetch_rst_text(link) + "\n"
+            
+            # Save all documentation into one file
+            with open('dearpygui_docs.txt', 'w', encoding='utf-8') as file:
+                file.write(full_documentation)
+            
+            print("Documentation has been saved to 'dearpygui_docs.txt'.")
+            ==================================================
+
+        📄 file_to_txt.py
+            File Contents:
+            ==================================================
+            def convert_py_to_txt(input_file, output_file):
+                try:
+                    # Open the Python file for reading
+                    with open(input_file, 'r') as py_file:
+                        # Read the contents of the file
+                        file_content = py_file.read()
+            
+                    # Open the text file for writing
+                    with open(output_file, 'w') as txt_file:
+                        # Write the content to the text file
+                        txt_file.write(file_content)
+            
+                    print(f"Successfully converted {input_file} to {output_file}")
+                
+                except FileNotFoundError:
+                    print(f"The file {input_file} was not found.")
+                except Exception as e:
+                    print(f"An error occurred: {e}")
+            
+            # Example usage
+            # Replace 'your_file.py' with your Python file and 'output.txt' with your desired text file name
+            convert_py_to_txt('.venv/lib/python3.12/site-packages/autogen/agentchat/groupchat.py', 'groupchat.txt')
+            ==================================================
+
+        📄 print_structure.py
+            File Contents:
+            ==================================================
+            # tools/print_structure.py
+            import os
+            from pathlib import Path
+            from typing import Set
+            
+            def print_directory_structure(
+                startpath: str = '.',
+                ignore_dirs: Set[str] = {'.git', '__pycache__', '.pytest_cache', '.venv', 'venv'},
+                ignore_files: Set[str] = {'.gitignore', '.env', '*.pyc'},
+                indent: str = '    '
+            ) -> None:
+                """
+                Print the directory structure starting from startpath.
+                
+                Args:
+                    startpath: Root directory to start from
+                    ignore_dirs: Directories to ignore
+                    ignore_files: File patterns to ignore
+                    indent: Indentation string
+                """
+                # Convert startpath to absolute path
+                startpath = os.path.abspath(startpath)
+                
+                # Print the root directory name
+                print(f'\nProject Structure for: {os.path.basename(startpath)}')
+                print('=' * 50)
+            
+                def should_ignore(path: str, patterns: Set[str]) -> bool:
+                    """Check if path matches any of the ignore patterns."""
+                    name = os.path.basename(path)
+                    return any(
+                        name == pattern or 
+                        (pattern.startswith('*') and name.endswith(pattern[1:]))
+                        for pattern in patterns
+                    )
+            
+                for root, dirs, files in os.walk(startpath):
+                    # Remove ignored directories
+                    dirs[:] = [d for d in dirs if not should_ignore(d, ignore_dirs)]
+                    
+                    # Calculate level for indentation
+                    level = root[len(startpath):].count(os.sep)
+                    
+                    # Print directory name
+                    indent_str = indent * level
+                    folder_name = os.path.basename(root)
+                    if level == 0:
+                        print('📁 .')
+                    else:
+                        print(f'{indent_str}📁 {folder_name}')
+                    
+                    # Print files
+                    file_indent = indent * (level + 1)
+                    for file in sorted(files):
+                        if not should_ignore(file, ignore_files):
+                            print(f'{file_indent}📄 {file}')
+            
+            if __name__ == '__main__':
+                # Get the project root directory (assuming this script is in tools/)
+                project_root = str(Path(__file__).parent.parent)
+                
+                print_directory_structure(
+                    startpath=project_root,
+                    ignore_dirs={
+                        '.git', '__pycache__', '.pytest_cache',
+                        '.venv', 'venv', 'node_modules', '.idea'
+                    },
+                    ignore_files={
+                        '.gitignore', '.env', '*.pyc', '.DS_Store',
+                        '*.pyo', '*.pyd', '.Python', '*.so'
+                    }
+                )            ==================================================
+
+        📄 project_to_text.py
+            File Contents:
+            ==================================================
+            import os
+            from pathlib import Path
+            from typing import Set, TextIO
+            from datetime import datetime
+            
+            def write_project_to_file(
+                startpath: str = '.',
+                output_file: str = 'project_contents.txt',
+                ignore_dirs: Set[str] = {'.git', '__pycache__', '.pytest_cache', '.venv', 'venv'},
+                ignore_files: Set[str] = {'.gitignore', '.env', '*.pyc'},
+                indent: str = '    '
+            ) -> None:
+                """
+                Write the entire project structure and file contents to a text file.
+                
+                Args:
+                    startpath: Root directory to start from
+                    output_file: Name of the output file
+                    ignore_dirs: Directories to ignore
+                    ignore_files: File patterns to ignore
+                    indent: Indentation string
+                """
+                # Convert startpath to absolute path
+                startpath = os.path.abspath(startpath)
+                
+                def should_ignore(path: str, patterns: Set[str]) -> bool:
+                    """Check if path matches any of the ignore patterns."""
+                    name = os.path.basename(path)
+                    return any(
+                        name == pattern or 
+                        (pattern.startswith('*') and name.endswith(pattern[1:]))
+                        for pattern in patterns
+                    )
+                
+                def write_file_contents(file_path: str, f: TextIO, indent_level: int) -> None:
+                    """Write the contents of a file with proper indentation."""
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as source_file:
+                            f.write(f"{indent * indent_level}File Contents:\n")
+                            f.write(f"{indent * indent_level}" + "=" * 50 + "\n")
+                            for line in source_file:
+                                f.write(f"{indent * indent_level}{line}")
+                            f.write(f"{indent * indent_level}" + "=" * 50 + "\n\n")
+                    except Exception as e:
+                        f.write(f"{indent * indent_level}[Error reading file: {str(e)}]\n\n")
+                
+                with open(output_file, 'w', encoding='utf-8') as f:
+                    # Write header information
+                    f.write(f"Project Export - {os.path.basename(startpath)}\n")
+                    f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write("=" * 50 + "\n\n")
+                    
+                    # Write project structure and contents
+                    for root, dirs, files in os.walk(startpath):
+                        # Remove ignored directories
+                        dirs[:] = [d for d in dirs if not should_ignore(d, ignore_dirs)]
+                        
+                        # Calculate level for indentation
+                        level = root[len(startpath):].count(os.sep)
+                        
+                        # Write directory name
+                        indent_str = indent * level
+                        folder_name = os.path.basename(root)
+                        if level == 0:
+                            f.write('📁 .\n')
+                        else:
+                            f.write(f'{indent_str}📁 {folder_name}\n')
+                        
+                        # Write files and their contents
+                        for file in sorted(files):
+                            if not should_ignore(file, ignore_files):
+                                file_path = os.path.join(root, file)
+                                f.write(f'{indent_str}{indent}📄 {file}\n')
+                                
+                                # Only write contents of text-based files
+                                if file.endswith(('.py', '.txt', '.md', '.json', '.yml', '.yaml', '.ini', '.cfg')):
+                                    write_file_contents(file_path, f, level + 2)
+            
+            if __name__ == '__main__':
+                # Get the project root directory (assuming this script is in the project)
+                project_root = str(Path(__file__).parent.parent)
+                
+                write_project_to_file(
+                    startpath=project_root,
+                    output_file='project_export.txt',
+                    ignore_dirs={
+                        '.git', '__pycache__', '.pytest_cache',
+                        '.venv', 'venv', 'node_modules', '.idea'
+                    },
+                    ignore_files={
+                        '.gitignore', '.env', '*.pyc', '.DS_Store',
+                        '*.pyo', '*.pyd', '.Python', '*.so'
+                    }
+                )            ==================================================
+
+        📄 web_search.py
+            File Contents:
+            ==================================================
+            # src/tools/web_search.py
+            import requests
+            from bs4 import BeautifulSoup
+            from typing import List, Dict, Optional
+            from datetime import datetime
+            
+            class WebSearchTool:
+                def __init__(self):
+                    self.headers = {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    }
+                    
+                def search_arxiv(self, query: str, max_results: int = 5) -> List[Dict]:
+                    """
+                    Search arXiv for papers matching the query.
+                    """
+                    base_url = 'http://export.arxiv.org/api/query'
+                    params = {
+                        'search_query': f'all:{query}',
+                        'start': 0,
+                        'max_results': max_results,
+                        'sortBy': 'submittedDate',
+                        'sortOrder': 'descending'
+                    }
+                    
+                    try:
+                        response = requests.get(base_url, params=params)
+                        response.raise_for_status()
+                        
+                        soup = BeautifulSoup(response.content, 'xml')
+                        entries = soup.find_all('entry')
+                        
+                        results = []
+                        for entry in entries:
+                            results.append({
+                                'title': entry.title.text.strip(),
+                                'authors': [author.text.strip() for author in entry.find_all('author')],
+                                'summary': entry.summary.text.strip(),
+                                'published': entry.published.text.strip(),
+                                'link': entry.id.text.strip()
+                            })
+                        
+                        return results
+                    except Exception as e:
+                        return [{"error": f"Error searching arXiv: {str(e)}"}]
+            
+                def search_scholar(self, query: str, max_results: int = 5) -> List[Dict]:
+                    """
+                    Scrape Google Scholar for recent papers (basic implementation).
+                    """
+                    base_url = 'https://scholar.google.com/scholar'
+                    params = {
+                        'q': query,
+                        'hl': 'en',
+                        'as_sdt': '0,5',  # Recent papers
+                        'num': max_results
+                    }
+                    
+                    try:
+                        response = requests.get(base_url, params=params, headers=self.headers)
+                        response.raise_for_status()
+                        
+                        soup = BeautifulSoup(response.content, 'html.parser')
+                        articles = soup.find_all('div', class_='gs_r gs_or gs_scl')
+                        
+                        results = []
+                        for article in articles[:max_results]:
+                            title_tag = article.find('h3', class_='gs_rt')
+                            if title_tag:
+                                title = title_tag.text.strip()
+                                link = title_tag.find('a')['href'] if title_tag.find('a') else None
+                                
+                                result = {
+                                    'title': title,
+                                    'link': link
+                                }
+                                
+                                # Try to extract authors and publication info
+                                pub_info = article.find('div', class_='gs_a')
+                                if pub_info:
+                                    result['publication_info'] = pub_info.text.strip()
+                                
+                                results.append(result)
+                        
+                        return results
+                    except Exception as e:
+                        return [{"error": f"Error searching Google Scholar: {str(e)}"}]
+            
+                def summarize_research(self, query: str) -> str:
+                    """
+                    Perform a comprehensive research search and return a summarized result.
+                    """
+                    arxiv_results = self.search_arxiv(query)
+                    scholar_results = self.search_scholar(query)
+                    
+                    summary = [
+                        f"Research Summary for: {query}\n",
+                        f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    ]
+                    
+                    if arxiv_results and not isinstance(arxiv_results[0].get('error'), str):
+                        summary.append("Recent arXiv Papers:")
+                        for i, paper in enumerate(arxiv_results, 1):
+                            summary.extend([
+                                f"\n{i}. {paper['title']}",
+                                f"   Authors: {', '.join(paper['authors'])}",
+                                f"   Published: {paper['published']}",
+                                f"   Link: {paper['link']}",
+                                f"   Summary: {paper['summary'][:200]}...\n"
+                            ])
+                    
+                    if scholar_results and not isinstance(scholar_results[0].get('error'), str):
+                        summary.append("\nGoogle Scholar Results:")
+                        for i, paper in enumerate(scholar_results, 1):
+                            summary.extend([
+                                f"\n{i}. {paper['title']}",
+                                f"   Details: {paper.get('publication_info', 'No details available')}",
+                                f"   Link: {paper.get('link', 'No link available')}\n"
+                            ])
+                    
+                    return "\n".join(summary)            ==================================================
+
+    📁 docker
+        📄 docker-compose.yml
+            File Contents:
+            ==================================================
+            version: '3.8'
+            
+            services:
+              multi_agent:
+                build: 
+                  context: ..
+                  dockerfile: docker/Dockerfile
+                container_name: multi_agent_system
+                volumes:
+                  - ..:/workspace
+                  - pip_cache:/root/.cache/pip
+                  - model_cache:/root/.cache/huggingface
+                environment:
+                  - PYTHONPATH=/workspace
+                  - OPENAI_API_KEY=${OPENAI_API_KEY}
+                  - PYTHONUNBUFFERED=1
+                ports:
+                  - "8888:8888"
+                  - "5000:5000"
+                deploy:
+                  resources:
+                    limits:
+                      memory: 8G
+                restart: unless-stopped
+                networks:
+                  - agent_net
+            
+            networks:
+              agent_net:
+                driver: bridge
+            
+            volumes:
+              pip_cache:
+              model_cache:            ==================================================
+
+        📄 dockerfile
+        📄 dockerignore
+    📁 docs
+    📁 testing
+        📄 orchestrator_framework_testing.py
+            File Contents:
+            ==================================================
+            from typing import Dict, List, Optional, Union, Callable, Set
+            from dataclasses import dataclass, field
+            import logging
+            from datetime import datetime
+            import asyncio
+            
+            from autogen import ConversableAgent
+            from autogen import Agent
+            from autogen import GroupChat, GroupChatManager
+            
+            logger = logging.getLogger(__name__)
+            
+            @dataclass
+            class TeamRole:
+                """Defines a role that can be assigned to agents"""
+                name: str
+                capabilities: Set[str]
+                description: str
+                primary_agent: Optional[Agent] = None
+                backup_agents: List[Agent] = field(default_factory=list)
+            
+            @dataclass
+            class Workflow:
+                """Represents a sequence of tasks with their dependencies"""
+                id: str
+                tasks: List[Dict]
+                dependencies: Dict[str, List[str]] = field(default_factory=dict)
+                status: str = "pending"
+                assigned_roles: Dict[str, str] = field(default_factory=dict)
+            
+            class DynamicTeamOrchestrator(GroupChatManager):
+                """
+                An enhanced GroupChatManager that orchestrates a team of AI agents with dynamic roles
+                and sophisticated task management.
+                """
+                
+                def __init__(
+                    self,
+                    team_name: str,
+                    roles: List[TeamRole],
+                    agents: List[Agent],
+                    admin_name: str = "Team Lead",
+                    max_round: int = 50,
+                    task_decomposition_prompt: Optional[str] = None,
+                    role_selection_prompt: Optional[str] = None
+                ):
+                    # Initialize team structure
+                    self.team_name = team_name
+                    self.roles = {role.name: role for role in roles}
+                    self.workflows: Dict[str, Workflow] = {}
+                    
+                    # Create specialized management agents
+                    self.task_planner = self._create_task_planner()
+                    self.role_manager = self._create_role_manager()
+                    self.workflow_monitor = self._create_workflow_monitor()
+                    
+                    # Add management agents to the team
+                    all_agents = [self.task_planner, self.role_manager, self.workflow_monitor] + agents
+                    
+                    # Custom prompts
+                    self.task_decomposition_prompt = task_decomposition_prompt or self._default_task_prompt()
+                    self.role_selection_prompt = role_selection_prompt or self._default_role_prompt()
+                    
+                    # Initialize GroupChat with enhanced selection method
+                    groupchat = GroupChat(
+                        agents=all_agents,
+                        messages=[],
+                        max_round=max_round,
+                        admin_name=admin_name,
+                        speaker_selection_method=self._dynamic_speaker_selection,
+                        allow_repeat_speaker=True
+                    )
+                    
+                    super().__init__(
+                        groupchat=groupchat,
+                        name=admin_name,
+                        system_message=f"Orchestrating team: {team_name}"
+                    )
+                    
+                    # Initialize role assignments
+                    self._assign_initial_roles()
+            
+                def _create_task_planner(self) -> ConversableAgent:
+                    """Creates the task planning specialist agent"""
+                    system_message = """You are a Task Planning Specialist who:
+                    1. Breaks down complex tasks into manageable subtasks
+                    2. Identifies dependencies between tasks
+                    3. Suggests optimal task sequences
+                    4. Estimates resource requirements
+                    Only respond with actionable task breakdowns."""
+                    
+                    return ConversableAgent(
+                        name="TaskPlanner",
+                        system_message=system_message,
+                        llm_config={
+                            "temperature": 0.2,
+                            "max_tokens": 1500
+                        }
+                    )
+            
+                def _create_role_manager(self) -> ConversableAgent:
+                    """Creates the role management specialist agent"""
+                    system_message = """You are a Role Management Specialist who:
+                    1. Matches agent capabilities to role requirements
+                    2. Suggests role reassignments based on performance
+                    3. Identifies skill gaps in the team
+                    4. Maintains optimal role coverage
+                    Focus on maximizing team effectiveness through role optimization."""
+                    
+                    return ConversableAgent(
+                        name="RoleManager",
+                        system_message=system_message,
+                        llm_config={
+                            "temperature": 0.3,
+                            "max_tokens": 1000
+                        }
+                    )
+            
+                def _create_workflow_monitor(self) -> ConversableAgent:
+                    """Creates the workflow monitoring specialist agent"""
+                    system_message = """You are a Workflow Monitoring Specialist who:
+                    1. Tracks progress of ongoing tasks
+                    2. Identifies bottlenecks and inefficiencies
+                    3. Suggests process improvements
+                    4. Monitors team communication patterns
+                    Provide concise status updates and actionable improvements."""
+                    
+                    return ConversableAgent(
+                        name="WorkflowMonitor",
+                        system_message=system_message,
+                        llm_config={
+                            "temperature": 0.2,
+                            "max_tokens": 800
+                        }
+                    )
+            
+                async def _dynamic_speaker_selection(
+                    self,
+                    last_speaker: Agent,
+                    groupchat: GroupChat
+                ) -> Union[Agent, str, None]:
+                    """Smart speaker selection based on context and current workflow state"""
+                    
+                    # Get current context
+                    current_message = groupchat.messages[-1] if groupchat.messages else None
+                    if not current_message:
+                        return "round_robin"
+            
+                    content = current_message.get("content", "")
+            
+                    # Analyze message content for next speaker selection
+                    if "task breakdown" in content.lower():
+                        return self.task_planner
+                    elif "role" in content.lower() or "assignment" in content.lower():
+                        return self.role_manager
+                    elif "status" in content.lower() or "progress" in content.lower():
+                        return self.workflow_monitor
+                    
+                    # Default to auto selection if no specific needs identified
+                    return "auto"
+            
+                async def initiate_workflow(self, objective: str) -> str:
+                    """Start a new workflow based on an objective"""
+                    
+                    # Generate workflow ID
+                    workflow_id = f"workflow_{len(self.workflows) + 1}"
+                    
+                    # Have task planner break down the objective
+                    task_msg = {
+                        "role": "user",
+                        "content": f"{self.task_decomposition_prompt}\n\nObjective: {objective}"
+                    }
+                    
+                    task_breakdown = await self.task_planner.a_generate_reply(
+                        messages=[task_msg],
+                        sender=self
+                    )
+                    
+                    # Parse task breakdown and create workflow
+                    tasks = self._parse_task_breakdown(task_breakdown)
+                    workflow = Workflow(
+                        id=workflow_id,
+                        tasks=tasks,
+                        status="initializing"
+                    )
+                    
+                    # Assign roles to tasks
+                    role_msg = {
+                        "role": "user",
+                        "content": f"{self.role_selection_prompt}\n\nTasks: {tasks}\nAvailable Roles: {list(self.roles.keys())}"
+                    }
+                    
+                    role_assignments = await self.role_manager.a_generate_reply(
+                        messages=[role_msg],
+                        sender=self
+                    )
+                    
+                    workflow.assigned_roles = self._parse_role_assignments(role_assignments)
+                    workflow.status = "ready"
+                    
+                    self.workflows[workflow_id] = workflow
+                    
+                    # Initiate the workflow execution
+                    asyncio.create_task(self._execute_workflow(workflow))
+                    
+                    return workflow_id
+            
+                async def _execute_workflow(self, workflow: Workflow):
+                    """Execute a workflow, managing task sequence and dependencies"""
+                    try:
+                        workflow.status = "in_progress"
+                        
+                        # Create initial group message about workflow
+                        intro_message = {
+                            "role": "system",
+                            "content": f"Beginning workflow {workflow.id}. Objective: {workflow.tasks[0].get('objective')}"
+                        }
+                        
+                        # Start group discussion about workflow
+                        self.groupchat.messages.append(intro_message)
+                        
+                        for task in workflow.tasks:
+                            # Check dependencies
+                            if not self._are_dependencies_met(task, workflow):
+                                continue
+                            
+                            # Get assigned role and agent
+                            role_name = workflow.assigned_roles.get(task["id"])
+                            if not role_name or role_name not in self.roles:
+                                logger.error(f"No role assigned for task {task['id']}")
+                                continue
+                                
+                            role = self.roles[role_name]
+                            agent = role.primary_agent
+                            
+                            if not agent:
+                                logger.error(f"No agent assigned to role {role_name}")
+                                continue
+                            
+                            # Create task message
+                            task_message = {
+                                "role": "user",
+                                "content": f"Please complete the following task:\n{task['description']}\n\nContext: {task.get('context', '')}"
+                            }
+                            
+                            # Have agent work on task
+                            result = await agent.a_generate_reply(
+                                messages=[task_message],
+                                sender=self
+                            )
+                            
+                            # Update task status
+                            task["status"] = "completed" if result else "failed"
+                            
+                            # Get workflow monitor's assessment
+                            monitor_msg = {
+                                "role": "user",
+                                "content": f"Task {task['id']} completed. Please assess progress and suggest any needed adjustments."
+                            }
+                            
+                            assessment = await self.workflow_monitor.a_generate_reply(
+                                messages=[monitor_msg],
+                                sender=self
+                            )
+                            
+                            # Adjust workflow based on monitor's assessment
+                            await self._handle_workflow_adjustment(workflow, assessment)
+                        
+                        workflow.status = "completed"
+                        
+                    except Exception as e:
+                        logger.error(f"Error in workflow {workflow.id}: {str(e)}")
+                        workflow.status = "failed"
+                
+                def _are_dependencies_met(self, task: Dict, workflow: Workflow) -> bool:
+                    """Check if all dependencies for a task are met"""
+                    task_id = task["id"]
+                    if task_id not in workflow.dependencies:
+                        return True
+                        
+                    for dep_id in workflow.dependencies[task_id]:
+                        dep_task = next((t for t in workflow.tasks if t["id"] == dep_id), None)
+                        if not dep_task or dep_task.get("status") != "completed":
+                            return False
+                            
+                    return True
+                
+                async def _handle_workflow_adjustment(self, workflow: Workflow, assessment: str):
+                    """Adjust workflow based on monitor's assessment"""
+                    if "reassign" in assessment.lower():
+                        # Get new role assignments
+                        await self._reassign_roles(workflow)
+                    elif "pause" in assessment.lower():
+                        workflow.status = "paused"
+                        # Handle pause logic
+                    elif "expedite" in assessment.lower():
+                        # Handle expedite logic
+                        pass
+                
+                async def _reassign_roles(self, workflow: Workflow):
+                    """Reassign roles based on current performance and needs"""
+                    role_msg = {
+                        "role": "user",
+                        "content": "Please suggest role reassignments based on current performance and workflow needs."
+                    }
+                    
+                    new_assignments = await self.role_manager.a_generate_reply(
+                        messages=[role_msg],
+                        sender=self
+                    )
+                    
+                    # Update role assignments
+                    new_roles = self._parse_role_assignments(new_assignments)
+                    workflow.assigned_roles.update(new_roles)
+            
+                def _default_task_prompt(self) -> str:
+                    """Default prompt for task decomposition"""
+                    return """Please break down this objective into specific tasks. For each task, provide:
+                    1. Task ID
+                    2. Description
+                    3. Required capabilities
+                    4. Expected dependencies
+                    5. Success criteria
+                    
+                    Format as a JSON structure."""
+            
+                def _default_role_prompt(self) -> str:
+                    """Default prompt for role selection"""
+                    return """Given these tasks and available roles, suggest the optimal role assignment for each task.
+                    Consider:
+                    1. Role capabilities vs task requirements
+                    2. Current workload and availability
+                    3. Task dependencies and sequence
+                    
+                    Provide assignments as task_id: role_name pairs."""
+            
+                def _parse_task_breakdown(self, breakdown: str) -> List[Dict]:
+                    """Parse the task breakdown response into structured task list"""
+                    # Implementation would parse the JSON response
+                    # This is a simplified version
+                    return [{"id": "1", "description": breakdown}]
+            
+                def _parse_role_assignments(self, assignments: str) -> Dict[str, str]:
+                    """Parse the role assignment response into task-role mapping"""
+                    # Implementation would parse the assignment response
+                    # This is a simplified version
+                    return {"1": "default_role"}
+            
+                def get_workflow_status(self, workflow_id: str) -> Dict:
+                    """Get detailed status of a specific workflow"""
+                    workflow = self.workflows.get(workflow_id)
+                    if not workflow:
+                        return {"error": "Workflow not found"}
+                        
+                    return {
+                        "id": workflow.id,
+                        "status": workflow.status,
+                        "tasks_completed": len([t for t in workflow.tasks if t.get("status") == "completed"]),
+                        "tasks_total": len(workflow.tasks),
+                        "current_assignments": workflow.assigned_roles
+                    }            ==================================================
+
+    📁 scripts
+        📄 jupyter.bat
+        📄 setup.bat
+        📄 shell.bat
+        📄 stop.bat
+    📁 .cache
+        📁 41
+            📄 cache.db
+    📁 src
+        📄 __init__.py
+            File Contents:
+            ==================================================
+            ==================================================
+
+        📄 config.py
+            File Contents:
+            ==================================================
+            import os
+            from typing import Dict, List
+            from dataclasses import dataclass
+            
+            @dataclass
+            class SystemConfig:
+                OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
+                DEFAULT_MODEL: str = "gpt-4o"
+                DOCKER_IMAGE: str = "python:3.12-slim"
+                CODE_TIMEOUT: int = 30
+                MAX_RETRIES: int = 3
+                WORKING_DIR: str = "workspace"
+            
+                @property
+                def llm_config_list(self) -> List[Dict]:
+                    return [
+                        {
+                            "model": self.DEFAULT_MODEL,
+                            "api_key": self.OPENAI_API_KEY
+                        }
+                    ]            ==================================================
+
+        📄 executor.py
+            File Contents:
+            ==================================================
+            import signal
+            from contextlib import contextmanager
+            from autogen.coding import DockerCommandLineCodeExecutor
+            import tempfile
+            import os
+            
+            class TimeoutException(Exception): pass
+            
+            @contextmanager
+            def time_limit(seconds):
+                def signal_handler(signum, frame):
+                    raise TimeoutException("Timed out!")
+                signal.signal(signal.SIGALRM, signal_handler)
+                signal.alarm(seconds)
+                try:
+                    yield
+                finally:
+                    signal.alarm(0)
+            
+            class EnhancedDockerExecutor(DockerCommandLineCodeExecutor):
+                def __init__(self, image: str, timeout: int = 30, workspace: str = None):
+                    self.workspace = workspace or tempfile.mkdtemp()
+                    os.makedirs(self.workspace, exist_ok=True)
+                    super().__init__(
+                        image=image,
+                        timeout=timeout,
+                        work_dir=self.workspace
+                    )
+                
+                def execute_with_error_handling(self, code: str) -> str:
+                    try:
+                        with time_limit(self.timeout):
+                            result = self.execute(code)
+                            return result
+                    except TimeoutException:
+                        return "Execution timed out!"
+                    except Exception as e:
+                        return f"Error during execution: {str(e)}"            ==================================================
+
+        📄 task_decomposition.py
+            File Contents:
+            ==================================================
+            # src/task_decomposition.py
+            from typing import List, Dict, Optional
+            from dataclasses import dataclass
+            from .agents.specialized import TeamManager
+            from autogen import AssistantAgent
+            
+            @dataclass
+            class SubTask:
+                """Represents a decomposed subtask"""
+                description: str
+                required_agents: List[str]
+                dependencies: List[str]  # IDs of tasks that must be completed first
+                status: str = "pending"  # pending, in_progress, completed, failed
+                result: Optional[str] = None
+                id: Optional[str] = None
+            
+            # src/task_decomposition.py
+            
+            class TaskDecomposer:
+                """Breaks down complex tasks into manageable subtasks"""
+                
+                def __init__(self, config, team_manager: TeamManager):
+                    self.config = config
+                    self.team_manager = team_manager
+                    
+                    # Create the decomposer agent
+                    self.decomposer = AssistantAgent(
+                        name="task_decomposer",
+                        system_message="""You are an expert at breaking down complex tasks into smaller, manageable subtasks.
+                        For each subtask, provide:
+                        1. A clear description
+                        2. Required agent types (must include at least one of: research, code, viz, qa, pm)
+                        3. Any dependencies on other subtasks
+                        
+                        Format each subtask as:
+                        ### Subtask [number]: [title]
+                        Description: [detailed description]
+                        Required Agents: [comma-separated list of required agents]
+                        Dependencies: [comma-separated list of subtask numbers or 'none']
+                        
+                        Example:
+                        ### Subtask 1: Research Latest Papers
+                        Description: Gather and analyze recent research papers on the topic
+                        Required Agents: research, qa
+                        Dependencies: none
+                        
+                        Available agent types:
+                        - research: For gathering and analyzing information
+                        - code: For programming and technical tasks
+                        - viz: For data visualization and presentation
+                        - qa: For quality assurance and testing
+                        - pm: For project management and coordination""",
+                        llm_config={"config_list": config.llm_config_list}
+                    )
+                
+                def decompose_task(self, task: str) -> List[SubTask]:
+                    """Decompose a complex task into subtasks"""
+                    
+                    # Ask the decomposer to analyze the task
+                    response = self.decomposer.generate_reply(
+                        messages=[{
+                            "role": "user",
+                            "content": f"""Please break down this task into subtasks:
+                            {task}
+                            
+                            Follow the format specified in your instructions, ensuring each subtask
+                            has required agents and dependencies clearly specified."""
+                        }]
+                    )
+                    
+                    # Parse the response into SubTask objects
+                    subtasks = self._parse_decomposition(response)
+                    
+                    # Validate subtasks
+                    self._validate_subtasks(subtasks)
+                    
+                    return subtasks
+                
+                def _parse_decomposition(self, response: str) -> List[SubTask]:
+                    """Parse the decomposer's response into SubTask objects"""
+                    subtasks = []
+                    current_subtask = None
+                    
+                    for line in response.split('\n'):
+                        line = line.strip()
+                        if not line:
+                            continue
+                            
+                        if line.startswith('### Subtask'):
+                            # Save previous subtask if exists
+                            if current_subtask and current_subtask.description:
+                                subtasks.append(current_subtask)
+                            
+                            # Create new subtask
+                            current_subtask = SubTask(
+                                description="",
+                                required_agents=[],
+                                dependencies=[],
+                                id=f"task_{len(subtasks)}"
+                            )
+                            # Add title to description
+                            current_subtask.description = line.split(':', 1)[1].strip() + "\n"
+                            
+                        elif current_subtask:
+                            if line.lower().startswith('description:'):
+                                desc = line.split(':', 1)[1].strip()
+                                current_subtask.description += desc + "\n"
+                                
+                            elif line.lower().startswith('required agents:'):
+                                agents = line.split(':', 1)[1].strip()
+                                current_subtask.required_agents = [
+                                    a.strip().lower() for a in agents.split(',')
+                                    if a.strip()
+                                ]
+                                
+                            elif line.lower().startswith('dependencies:'):
+                                deps = line.split(':', 1)[1].strip()
+                                if deps.lower() != 'none':
+                                    current_subtask.dependencies = [
+                                        f"task_{int(d.strip())-1}" 
+                                        for d in deps.split(',')
+                                        if d.strip().isdigit()
+                                    ]
+                            
+                            else:
+                                # Add to description
+                                current_subtask.description += line + "\n"
+                    
+                    # Add the last subtask
+                    if current_subtask and current_subtask.description:
+                        subtasks.append(current_subtask)
+                        
+                    return subtasks
+                
+                def _validate_subtasks(self, subtasks: List[SubTask]):
+                    """Validate that subtasks are properly formed"""
+                    for task in subtasks:
+                        # Ensure each task has at least one agent
+                        if not task.required_agents:
+                            raise ValueError(f"Task {task.id} has no required agents specified")
+                        
+                        # Validate agent types
+                        valid_agents = {'research', 'code', 'viz', 'qa', 'pm'}
+                        invalid_agents = set(task.required_agents) - valid_agents
+                        if invalid_agents:
+                            raise ValueError(f"Task {task.id} has invalid agent types: {invalid_agents}")
+                        
+                        # Validate dependencies
+                        for dep in task.dependencies:
+                            if not any(t.id == dep for t in subtasks):
+                                raise ValueError(f"Task {task.id} has invalid dependency: {dep}")
+            
+            
+            class TaskExecutor:
+                """Executes decomposed tasks using the appropriate agents"""
+                
+                def __init__(self, team_manager: TeamManager):
+                    self.team_manager = team_manager
+                    self.completed_tasks: Dict[str, SubTask] = {}
+                    
+                def execute_subtasks(self, subtasks: List[SubTask]) -> Dict[str, Dict]:
+                    """Execute a list of subtasks in the correct order"""
+                    results = {}
+                    
+                    while subtasks:
+                        # Find tasks that can be executed (all dependencies met)
+                        ready_tasks = [
+                            task for task in subtasks
+                            if all(dep in self.completed_tasks for dep in task.dependencies)
+                        ]
+                        
+                        if not ready_tasks:
+                            raise Exception("Dependency cycle detected or no tasks ready")
+                        
+                        # Execute ready tasks
+                        for task in ready_tasks:
+                            print(f"\nExecuting task: {task.description}")
+                            
+                            # Get the required agents
+                            agents = [
+                                self.team_manager.get_agent(role)
+                                for role in task.required_agents
+                                if self.team_manager.get_agent(role) is not None
+                            ]
+                            
+                            try:
+                                # Execute the task with the group
+                                result = self.team_manager.execute_group_task(
+                                    task_description=task.description,
+                                    agents=agents
+                                )
+                                
+                                # Store the result
+                                if result["success"]:
+                                    task.status = "completed"
+                                    self.completed_tasks[task.id] = task
+                                else:
+                                    task.status = "failed"
+                                
+                                results[task.id] = {
+                                    "status": task.status,
+                                    "result": result,
+                                    "description": task.description,
+                                    "agents": [agent.name for agent in agents]
+                                }
+                                
+                            except Exception as e:
+                                print(f"Task failed: {str(e)}")
+                                task.status = "failed"
+                                results[task.id] = {
+                                    "status": "failed",
+                                    "error": str(e),
+                                    "description": task.description,
+                                    "agents": [agent.name for agent in agents]
+                                }
+                            
+                            # Remove completed/failed task from the list
+                            subtasks.remove(task)
+                            
+                            # Print progress
+                            print(f"Task {task.id} {task.status}")
+                    
+                    return results
+                
+                
+            def decompose_and_execute(
+                task: str,
+                config,
+                team_manager: TeamManager
+            ) -> Dict[str, Dict]:
+                """Main function to decompose and execute a complex task"""
+                
+                # Create decomposer and executor
+                decomposer = TaskDecomposer(config, team_manager)
+                executor = TaskExecutor(team_manager)
+                
+                try:
+                    # Decompose the task
+                    print("Decomposing task...")
+                    subtasks = decomposer.decompose_task(task)
+                    
+                    # Log the decomposition
+                    print("\nTask Decomposition:")
+                    for task in subtasks:
+                        print(f"\nTask {task.id}:")
+                        print(f"Description: {task.description.strip()}")
+                        print(f"Required Agents: {', '.join(task.required_agents)}")
+                        print(f"Dependencies: {', '.join(task.dependencies) if task.dependencies else 'none'}")
+                    
+                    # Execute subtasks
+                    print("\nExecuting subtasks...")
+                    results = executor.execute_subtasks(subtasks)
+                    
+                    return results
+                    
+                except Exception as e:
+                    print(f"\nError in task decomposition/execution: {str(e)}")
+                    return {"error": str(e)}            ==================================================
+
+        📄 team_orchestrator.py
+            File Contents:
+            ==================================================
+            from typing import Dict, List, Optional, Union, Set, Tuple
+            from dataclasses import dataclass, field
+            import logging
+            from datetime import datetime
+            import asyncio
+            import networkx as nx
+            from collections import defaultdict
+            
+            from autogen import ConversableAgent
+            from autogen import Agent
+            from autogen import GroupChat, GroupChatManager
+            from .memory_store import VectorMemoryStore  # Hypothetical memory store
+            
+            logger = logging.getLogger(__name__)
+            
+            @dataclass
+            class TeamRole:
+                """Defines a role that can be assigned to agents"""
+                name: str
+                capabilities: Set[str]
+                description: str
+                primary_agent: Optional[Agent] = None
+                backup_agents: List[Agent] = field(default_factory=list)
+            
+            @dataclass
+            class WorkflowEvent:
+                """Represents a significant event in the workflow for the ledger"""
+                timestamp: datetime
+                event_type: str
+                workflow_id: str
+                task_id: Optional[str]
+                agent_id: Optional[str]
+                details: Dict
+            
+            @dataclass
+            class Workflow:
+                """Represents a sequence of tasks with their dependencies"""
+                id: str
+                tasks: List[Dict]
+                dependencies: Dict[str, List[str]] = field(default_factory=dict)
+                status: str = "pending"
+                assigned_roles: Dict[str, str] = field(default_factory=dict)
+            
+            class WorkflowLedger:
+                """Maintains a comprehensive record of workflow execution and decisions"""
+                
+                def __init__(self, vector_store: VectorMemoryStore):
+                    self.events: List[WorkflowEvent] = []
+                    self.agent_memories: Dict[str, Dict] = defaultdict(dict)
+                    self.vector_store = vector_store
+                    self.task_graph = nx.DiGraph()
+                    
+                async def record_event(self, event: WorkflowEvent):
+                    """Record a new event and update relevant metrics"""
+                    self.events.append(event)
+                    
+                    # Update agent metrics if applicable
+                    if event.agent_id:
+                        self._update_agent_metrics(event)
+                        
+                    # Store in vector database for future reference
+                    await self.vector_store.store(
+                        f"{event.workflow_id}_{event.timestamp.isoformat()}",
+                        event.details
+                    )
+                
+                def _update_agent_metrics(self, event: WorkflowEvent):
+                    """Update agent performance metrics based on event"""
+                    metrics = self.agent_memories[event.agent_id]
+                    
+                    if event.event_type == "task_complete":
+                        metrics["successful_tasks"] = metrics.get("successful_tasks", 0) + 1
+                    elif event.event_type == "task_failed":
+                        metrics["failed_tasks"] = metrics.get("failed_tasks", 0) + 1
+                        
+                    # Calculate success rate
+                    total_tasks = metrics.get("successful_tasks", 0) + metrics.get("failed_tasks", 0)
+                    if total_tasks > 0:
+                        metrics["success_rate"] = metrics.get("successful_tasks", 0) / total_tasks
+            
+            class UnifiedTeamOrchestrator(GroupChatManager):
+                """
+                Enhanced GroupChatManager that combines dynamic team orchestration with 
+                sophisticated ledger and memory systems.
+                """
+                
+                def __init__(
+                    self,
+                    team_name: str,
+                    roles: List[TeamRole],
+                    agents: List[Agent],
+                    vector_store: VectorMemoryStore,
+                    admin_name: str = "Team Lead",
+                    max_round: int = 50,
+                    task_decomposition_prompt: Optional[str] = None,
+                    role_selection_prompt: Optional[str] = None
+                ):
+                    # Initialize management agents first
+                    self.task_planner = self._create_task_planner()
+                    self.role_manager = self._create_role_manager()
+                    self.workflow_monitor = self._create_workflow_monitor()
+                    self.dependency_validator = self._create_dependency_validator()
+                    self.compliance_monitor = self._create_compliance_monitor()
+                    
+                    # Combine all agents
+                    all_agents = [
+                        self.task_planner,
+                        self.role_manager,
+                        self.workflow_monitor,
+                        self.dependency_validator,
+                        self.compliance_monitor
+                    ] + agents
+                    
+                    # Initialize GroupChat with enhanced selection method
+                    groupchat = GroupChat(
+                        agents=all_agents,
+                        messages=[],
+                        max_round=max_round,
+                        admin_name=admin_name,
+                        speaker_selection_method=self._dynamic_speaker_selection,
+                        allow_repeat_speaker=True
+                    )
+                    
+                    # Initialize GroupChatManager parent
+                    super().__init__(
+                        groupchat=groupchat,
+                        name=admin_name,
+                        system_message=f"Orchestrating team: {team_name}"
+                    )
+                    
+                    # Initialize own attributes
+                    self.team_name = team_name
+                    self.roles = {role.name: role for role in roles}
+                    self.ledger = WorkflowLedger(vector_store)
+                    self.workflows: Dict[str, Workflow] = {}
+                    
+                    # Store prompts
+                    self.task_decomposition_prompt = task_decomposition_prompt or self._default_task_prompt()
+                    self.role_selection_prompt = role_selection_prompt or self._default_role_prompt()
+                
+                def _create_task_planner(self) -> ConversableAgent:
+                    """Creates the task planning specialist agent"""
+                    return ConversableAgent(
+                        name="TaskPlanner",
+                        system_message="""You are a Task Planning Specialist who:
+                        1. Breaks down complex tasks into manageable subtasks
+                        2. Identifies dependencies between tasks
+                        3. Suggests optimal task sequences
+                        4. Estimates resource requirements
+                        Only respond with actionable task breakdowns.""",
+                        llm_config={"temperature": 0.2}
+                    )
+            
+                def _create_role_manager(self) -> ConversableAgent:
+                    """Creates the role management specialist agent"""
+                    return ConversableAgent(
+                        name="RoleManager",
+                        system_message="""You are a Role Management Specialist who:
+                        1. Matches agent capabilities to role requirements
+                        2. Suggests role reassignments based on performance
+                        3. Identifies skill gaps in the team
+                        4. Maintains optimal role coverage
+                        Focus on maximizing team effectiveness through role optimization.""",
+                        llm_config={"temperature": 0.3}
+                    )
+            
+                def _create_workflow_monitor(self) -> ConversableAgent:
+                    """Creates the workflow monitoring specialist agent"""
+                    return ConversableAgent(
+                        name="WorkflowMonitor",
+                        system_message="""You are a Workflow Monitoring Specialist who:
+                        1. Tracks progress of ongoing tasks
+                        2. Identifies bottlenecks and inefficiencies
+                        3. Suggests process improvements
+                        4. Monitors team communication patterns
+                        Provide concise status updates and actionable improvements.""",
+                        llm_config={"temperature": 0.2}
+                    )
+            
+                def _create_dependency_validator(self) -> ConversableAgent:
+                    """Creates the dependency validation specialist agent"""
+                    return ConversableAgent(
+                        name="DependencyValidator",
+                        system_message="""You are a Dependency Validation Specialist who:
+                        1. Validates task dependencies before execution
+                        2. Ensures prerequisite tasks are properly completed
+                        3. Identifies potential dependency conflicts
+                        4. Suggests optimal task ordering
+                        Focus on maintaining workflow integrity through proper dependency management.""",
+                        llm_config={"temperature": 0.2}
+                    )
+            
+                def _create_compliance_monitor(self) -> ConversableAgent:
+                    """Creates the compliance monitoring specialist agent"""
+                    return ConversableAgent(
+                        name="ComplianceMonitor",
+                        system_message="""You are a Compliance Monitoring Specialist who:
+                        1. Ensures actions meet safety and compliance requirements
+                        2. Validates data handling procedures
+                        3. Monitors for potential risks
+                        4. Maintains audit trails of critical decisions
+                        Focus on maintaining system integrity and safety.""",
+                        llm_config={"temperature": 0.2}
+                    )
+            
+                async def _dynamic_speaker_selection(
+                    self,
+                    last_speaker: Agent,
+                    groupchat: GroupChat
+                ) -> Union[Agent, str, None]:
+                    """Smart speaker selection based on context and current workflow state"""
+                    current_message = groupchat.messages[-1] if groupchat.messages else None
+                    if not current_message:
+                        return "round_robin"
+            
+                    content = current_message.get("content", "").lower()
+            
+                    # Route to appropriate specialist based on content
+                    if "task" in content or "breakdown" in content:
+                        return self.task_planner
+                    elif "role" in content or "assignment" in content:
+                        return self.role_manager
+                    elif "status" in content or "progress" in content:
+                        return self.workflow_monitor
+                    elif "dependency" in content or "prerequisite" in content:
+                        return self.dependency_validator
+                    elif "compliance" in content or "safety" in content:
+                        return self.compliance_monitor
+                        
+                    return "auto"
+            
+                async def initiate_workflow(self, objective: str) -> str:
+                    """Initiate a new workflow with full monitoring and validation"""
+                    workflow_id = f"workflow_{len(self.workflows) + 1}"
+                    
+                    # Record workflow initiation
+                    await self.ledger.record_event(
+                        WorkflowEvent(
+                            timestamp=datetime.now(),
+                            event_type="workflow_start",
+                            workflow_id=workflow_id,
+                            task_id=None,
+                            agent_id=None,
+                            details={"objective": objective}
+                        )
+                    )
+                    
+                    try:
+                        # Get task breakdown from task planner
+                        tasks = await self._get_task_breakdown(objective)
+                        
+                        # Validate dependencies
+                        await self._validate_dependencies(tasks)
+                        
+                        # Get role assignments
+                        role_assignments = await self._assign_roles(tasks)
+                        
+                        # Create workflow
+                        workflow = Workflow(
+                            id=workflow_id,
+                            tasks=tasks,
+                            assigned_roles=role_assignments
+                        )
+                        self.workflows[workflow_id] = workflow
+                        
+                        # Begin execution
+                        asyncio.create_task(self._execute_workflow(workflow))
+                        
+                        return workflow_id
+                        
+                    except Exception as e:
+                        await self.ledger.record_event(
+                            WorkflowEvent(
+                                timestamp=datetime.now(),
+                                event_type="workflow_error",
+                                workflow_id=workflow_id,
+                                task_id=None,
+                                agent_id=None,
+                                details={"error": str(e)}
+                            )
+                        )
+                        raise
+            
+                async def _execute_workflow(self, workflow: Workflow):
+                    """Execute workflow with monitoring and adaptability"""
+                    try:
+                        workflow.status = "in_progress"
+                        
+                        for task in workflow.tasks:
+                            if not await self._are_dependencies_met(task, workflow):
+                                continue
+                                
+                            # Get assigned agent
+                            role_name = workflow.assigned_roles.get(task["id"])
+                            if not role_name:
+                                continue
+                                
+                            role = self.roles[role_name]
+                            agent = role.primary_agent
+                            
+                            if not agent:
+                                continue
+                                
+                            # Execute task with monitoring
+                            await self._execute_task(task, agent, workflow.id)
+                            
+                            # Get workflow monitor's assessment
+                            await self._assess_workflow_progress(workflow)
+                            
+                        workflow.status = "completed"
+                        
+                    except Exception as e:
+                        workflow.status = "failed"
+                        logger.error(f"Workflow {workflow.id} failed: {str(e)}")
+                        raise
+            
+                def get_workflow_status(self, workflow_id: str) -> Dict:
+                    """Get detailed status of a specific workflow"""
+                    workflow = self.workflows.get(workflow_id)
+                    if not workflow:
+                        return {"error": "Workflow not found"}
+                        
+                    return {
+                        "id": workflow.id,
+                        "status": workflow.status,
+                        "tasks_completed": len([t for t in workflow.tasks if t.get("status") == "completed"]),
+                        "tasks_total": len(workflow.tasks),
+                        "current_assignments": workflow.assigned_roles,
+                        "agent_metrics": {
+                            agent_id: self.ledger.agent_memories[agent_id]
+                            for agent_id in self.ledger.agent_memories
+                        }
+                    }
+            
+                def _default_task_prompt(self) -> str:
+                    """Default prompt for task decomposition"""
+                    return """Please break down this objective into specific tasks. For each task, provide:
+                    1. Task ID
+                    2. Description
+                    3. Required capabilities
+                    4. Expected dependencies
+                    5. Success criteria
+                    
+                    Format as a JSON structure."""
+            
+                def _default_role_prompt(self) -> str:
+                    """Default prompt for role selection"""
+                    return """Given these tasks and available roles, suggest the optimal role assignment for each task.
+                    Consider:
+                    1. Role capabilities vs task requirements
+                    2. Current workload and availability
+                    3. Task dependencies and sequence
+                    
+                    Provide assignments as task_id: role_name pairs."""            ==================================================
+
+        📄 team_task.py
+            File Contents:
+            ==================================================
+            # src/team_tasks.py
+            from typing import List, Dict
+            from .agents.specialized import TeamManager
+            from .config import SystemConfig
+            from autogen import GroupChat, GroupChatManager
+            
+            class GroupTaskManager:
+                """Manages group tasks and agent interactions"""
+                def __init__(self, config: SystemConfig, executor):
+                    self.team_manager = TeamManager(config, executor)
+                    self.config = config
+                    
+                def create_group_chat(self, agents: List[str], task: str) -> tuple:
+                    """Create a group chat with specified agents"""
+                    # Get requested agents
+                    selected_agents = [
+                        self.team_manager.get_agent(role)
+                        for role in agents
+                        if self.team_manager.get_agent(role)
+                    ]
+                    
+                    # Create group chat with updated configuration based on latest AutoGen API
+                    group_chat = GroupChat(
+                        agents=selected_agents,
+                        messages=[],
+                        max_round=50,
+                        send_introductions=True,  # Agents will introduce themselves
+                    )
+                    
+                    # Create chat manager with updated configuration
+                    manager = GroupChatManager(
+                        groupchat=group_chat,
+                        llm_config={"config_list": self.config.llm_config_list},
+                        system_message="""You are a group chat manager coordinating a team of AI agents.
+                        Help them work together effectively to solve the given task.
+                        Ensure each agent contributes according to their expertise.""",
+                    )
+                    
+                    return manager, group_chat
+            
+                def format_task(self, task: str) -> str:
+                    """Format task message with clear instructions"""
+                    return f"""
+                    TASK DESCRIPTION:
+                    {task}
+                    
+                    COLLABORATION GUIDELINES:
+                    1. Project Manager (pm) should coordinate the overall effort
+                    2. Each specialist should contribute based on their expertise
+                    3. Maintain clear communication and documentation
+                    4. Verify results and quality at each step
+                    
+                    EXPECTED OUTCOMES:
+                    1. Clear documentation of the process
+                    2. Quality-assured results
+                    3. Proper testing and validation
+                    4. Performance considerations
+                    
+                    Please begin with task planning and proceed with execution.
+                    """
+                
+                def execute_task(self, task: str, required_agents: List[str]) -> Dict:
+                    """Execute a task using the specified agents"""
+                    try:
+                        # Create group chat
+                        manager, chat = self.create_group_chat(required_agents, task)
+                        
+                        # Format task message
+                        formatted_task = self.format_task(task)
+                        
+                        # Get the first agent to initiate the chat
+                        initiator = chat.agents[0]
+                        
+                        # Start the group chat with the first agent as initiator
+                        chat_result = initiator.initiate_chat(
+                            recipient=manager,
+                            message=formatted_task,
+                        )
+                        
+                        return {
+                            "result": chat_result,
+                            "chat_history": chat.messages,
+                            "participants": [agent.name for agent in chat.agents]
+                        }
+                        
+                    except Exception as e:
+                        print(f"\nError during task execution: {str(e)}")
+                        return {
+                            "error": str(e),
+                            "participants": [agent.name for agent in chat.agents] if 'chat' in locals() else [],
+                            "status": "failed"
+                        }            ==================================================
+
+        📄 utils.py
+            File Contents:
+            ==================================================
+            import logging
+            from typing import Optional
+            import signal
+            import logging
+            from typing import Optional
+            
+            from src.agents import EnhancedAssistantAgent, EnhancedUserProxy
+            from src.config import SystemConfig
+            from src.executor import EnhancedDockerExecutor
+            
+            class GracefulExitHandler:
+                def __init__(self):
+                    self.exit_now = False
+                    signal.signal(signal.SIGINT, self.exit_gracefully)
+                    signal.signal(signal.SIGTERM, self.exit_gracefully)
+            
+                def exit_gracefully(self, *args):
+                    self.exit_now = True
+                    print("\nReceived exit signal. Cleaning up...")
+                    
+            # Main application
+            
+            def setup_logging():
+                logging.basicConfig(
+                    level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+                )
+            
+            class MultiAgentSystem:
+                def __init__(self, config: Optional[SystemConfig] = None):
+                    self.config = config or SystemConfig()
+                    self.exit_handler = GracefulExitHandler()
+                    self.executor = EnhancedDockerExecutor(
+                        image=self.config.DOCKER_IMAGE,
+                        timeout=self.config.CODE_TIMEOUT,
+                        workspace=self.config.WORKING_DIR
+                    )
+                    self.assistant = EnhancedAssistantAgent("assistant", self.config)
+                    self.user_proxy = EnhancedUserProxy("user_proxy", self.executor)
+                    setup_logging()
+            
+                def run_task(self, task_message: str, save_history: bool = True) -> None:
+                    try:
+                        self.user_proxy.initiate_chat(
+                            self.assistant,
+                            message=task_message
+                        )
+                        if save_history:
+                            self.user_proxy.save_conversation("conversation_history.txt")
+                    except KeyboardInterrupt:
+                        print("\nGracefully shutting down...")
+                    except Exception as e:
+                        logging.error(f"Error during task execution: {e}")
+                    finally:
+                        self.cleanup()
+            
+                def cleanup(self):
+                    try:
+                        self.executor.stop()
+                    except Exception as e:
+                        logging.error(f"Error during cleanup: {e}")
+            ==================================================
+
+        📁 ui
+            📄 chat_window.py
+                File Contents:
+                ==================================================
+                import logging
+                import queue
+                import threading
+                import time
+                import dearpygui.dearpygui as dpg
+                from typing import Dict, List, Optional
+                import networkx as nx
+                import math
+                from datetime import datetime
+                import tkinter as tk
+                
+                def get_screen_size_percentage(percentage=0.80):
+                    # Create a root window and hide it
+                    root = tk.Tk()
+                    root.withdraw()
+                
+                    # Get the screen width and height
+                    screen_width = root.winfo_screenwidth()
+                    screen_height = root.winfo_screenheight()
+                
+                    # Calculate the width and height based on the percentage
+                    width = int(screen_width * percentage)
+                    height = int(screen_height * percentage)
+                
+                    # Destroy the root window
+                    root.destroy()
+                
+                    return width, height
+                
+                logger = logging.getLogger(__name__)
+                
+                class AgentMonitor:
+                    def __init__(self):
+                        self.message_queue = queue.Queue()
+                        self.agents: Dict[str, Dict] = {}
+                        self.workflows: Dict[str, Dict] = {}
+                        self.selected_workflow_id: Optional[str] = None
+                        
+                        # Performance metrics
+                        self.metrics = {
+                            "messages_processed": 0,
+                            "active_workflows": 0,
+                            "tasks_completed": 0
+                        }
+                
+                        # Create context
+                        dpg.create_context()
+                
+                    def setup_ui(self):
+                        """Initialize the monitoring UI components"""
+                        # Create viewport
+                        dpg.create_viewport(title="Agent Monitoring System", width=1200, height=800)
+                        
+                        with dpg.window(label="Agent Monitor", tag="primary_window"):
+                            with dpg.group(horizontal=True):
+                                # Left panel - Controls and Status
+                                with dpg.child_window(width=300, height=800):
+                                    with dpg.collapsing_header(label="System Status", default_open=True):
+                                        dpg.add_text("Active Agents:", tag="active_agents_text")
+                                        dpg.add_text("Active Workflows:", tag="active_workflows_text")
+                                        dpg.add_text("Messages Processed:", tag="messages_text")
+                                    
+                                    with dpg.collapsing_header(label="Workflow Control", default_open=True):
+                                        dpg.add_button(label="Start New Workflow", callback=self.start_new_workflow)
+                                        dpg.add_button(label="Stop Selected", callback=self.stop_selected_workflow)
+                                        
+                                    with dpg.collapsing_header(label="Agent List", default_open=True):
+                                        self.agent_list = dpg.add_listbox(
+                                            tag="agent_list",
+                                            items=[],
+                                            num_items=10,
+                                            callback=self.select_agent
+                                        )
+                
+                                # Right panel - Visualizations
+                                with dpg.child_window(width=900, height=800):
+                                    with dpg.tab_bar():
+                                        with dpg.tab(label="Workflow Graph"):
+                                            self.graph_view = dpg.add_drawlist(width=880, height=400)
+                                            
+                                        with dpg.tab(label="Message Log"):
+                                            self.message_log = dpg.add_child_window(width=880, height=400)
+                                            
+                                        with dpg.tab(label="Metrics"):
+                                            with dpg.plot(label="Activity Over Time", height=400):
+                                                dpg.add_plot_legend()
+                                                dpg.add_plot_axis(dpg.mvXAxis, label="Time")
+                                                self.x_axis = dpg.last_item()
+                                                dpg.add_plot_axis(dpg.mvYAxis, label="Count")
+                                                self.y_axis = dpg.last_item()
+                                                
+                                                self.message_series = dpg.add_line_series(
+                                                    [], [], label="Messages",
+                                                    parent=self.y_axis
+                                                )
+                
+                        # Set primary window and show viewport
+                        dpg.set_primary_window("primary_window", True)
+                
+                    def start_new_workflow(self, sender, app_data):
+                        """Start a new agent workflow"""
+                        logger.info("Starting new workflow")
+                        # Implementation here - safe to call from UI thread
+                
+                    def stop_selected_workflow(self, sender, app_data):
+                        """Stop the currently selected workflow"""
+                        if self.selected_workflow_id:
+                            logger.info(f"Stopping workflow {self.selected_workflow_id}")
+                            # Implementation here - safe to call from UI thread
+                
+                    def select_agent(self, sender, app_data):
+                        """Handle agent selection from the list"""
+                        selected_agent = self.agents.get(app_data)
+                        if selected_agent:
+                            logger.info(f"Selected agent: {app_data}")
+                            # Update UI elements for selected agent
+                
+                    def update_metrics(self):
+                        """Update UI metrics - safe to call from render loop"""
+                        dpg.set_value("active_agents_text", f"Active Agents: {len(self.agents)}")
+                        dpg.set_value("active_workflows_text", f"Active Workflows: {self.metrics['active_workflows']}")
+                        dpg.set_value("messages_text", f"Messages: {self.metrics['messages_processed']}")
+                
+                    def update_graph(self):
+                        """Update the workflow graph visualization - safe to call from render loop"""
+                        if not self.selected_workflow_id:
+                            return
+                
+                        workflow = self.workflows.get(self.selected_workflow_id)
+                        if not workflow:
+                            return
+                
+                        # Clear previous graph
+                        dpg.delete_item(self.graph_view, children_only=True)
+                        
+                        # Draw nodes and edges
+                        node_positions = {}
+                        for agent in workflow['agents']:
+                            x = len(node_positions) * 100 + 50
+                            y = 200
+                            node_positions[agent['name']] = (x, y)
+                            
+                            # Draw node
+                            dpg.draw_circle((x, y), 20, parent=self.graph_view, fill=(0, 255, 0, 100))
+                            dpg.draw_text((x-30, y+25), agent['name'], parent=self.graph_view)
+                
+                        # Draw edges for interactions
+                        for interaction in workflow['interactions']:
+                            if interaction['from'] in node_positions and interaction['to'] in node_positions:
+                                start = node_positions[interaction['from']]
+                                end = node_positions[interaction['to']]
+                                dpg.draw_line(start, end, parent=self.graph_view, color=(255, 255, 255, 100))
+                
+                    def process_message(self, message: Dict):
+                        """Process incoming messages - safe to call from render loop"""
+                        msg_type = message.get('type')
+                        
+                        if msg_type == 'new_agent':
+                            self.agents[message['agent_id']] = message['data']
+                            
+                        elif msg_type == 'agent_update':
+                            if message['agent_id'] in self.agents:
+                                self.agents[message['agent_id']].update(message['data'])
+                                
+                        elif msg_type == 'new_workflow':
+                            self.workflows[message['workflow_id']] = message['data']
+                            self.metrics['active_workflows'] += 1
+                            
+                        elif msg_type == 'workflow_update':
+                            if message['workflow_id'] in self.workflows:
+                                self.workflows[message['workflow_id']].update(message['data'])
+                                
+                        elif msg_type == 'message':
+                            self.metrics['messages_processed'] += 1
+                
+                        # Update UI elements
+                        dpg.configure_item("agent_list", items=list(self.agents.keys()))
+                
+                    def run(self):
+                        """Main application loop using DearPyGui's render loop"""
+                        # Setup and show viewport
+                        dpg.setup_dearpygui()
+                        dpg.show_viewport()
+                
+                        # Main loop
+                        while dpg.is_dearpygui_running():
+                            # Process any messages in queue
+                            try:
+                                while not self.message_queue.empty():
+                                    msg = self.message_queue.get_nowait()
+                                    self.process_message(msg)
+                            except queue.Empty:
+                                pass
+                
+                            # Update UI
+                            self.update_metrics()
+                            self.update_graph()
+                            
+                            # Render frame
+                            dpg.render_dearpygui_frame()
+                
+                        # Cleanup
+                        dpg.destroy_context()
+                
+                def main():
+                    # Setup logging
+                    logging.basicConfig(level=logging.INFO)
+                    
+                    try:
+                        # Create and run monitor
+                        monitor = AgentMonitor()
+                        monitor.setup_ui()
+                        # Create test data
+                        monitor.message_queue.put({
+                            "type": "new_agent",
+                            "agent_id": "researcher_1",
+                            "data": {
+                                "name": "Researcher",
+                                "status": "active",
+                                "tasks": []
+                            }
+                        })
+                
+                        # Run the monitor
+                        monitor.run()
+                    except Exception as e:
+                        logger.error(f"Application error: {e}")
+                        raise
+                
+                if __name__ == "__main__":
+                    main()                ==================================================
+
+            📄 workflow_monitor.py
+                File Contents:
+                ==================================================
+                import dearpygui.dearpygui as dpg
+                from typing import Dict, List, Optional
+                import networkx as nx
+                import matplotlib.pyplot as plt
+                from io import BytesIO
+                import base64
+                from datetime import datetime
+                
+                class WorkflowMonitor:
+                    def __init__(self):
+                        self.active_workflows: Dict[str, Dict] = {}
+                        self.selected_workflow_id: Optional[str] = None
+                        self.graph_view_id: Optional[int] = None
+                        self.timeline_view_id: Optional[int] = None
+                
+                    def select_workflow_callback(self, sender, app_data, user_data):
+                        """Callback for when a workflow is selected in the UI"""
+                        self.selected_workflow_id = user_data
+                        self.update_views()
+                
+                    def update_views(self):
+                        """Update both graph and timeline views based on selected workflow"""
+                        if self.selected_workflow_id and self.selected_workflow_id in self.active_workflows:
+                            workflow = self.active_workflows[self.selected_workflow_id]
+                            self.update_graph_view(workflow)
+                            self.update_timeline_view(workflow)
+                
+                    def update_graph_view(self, workflow: Dict):
+                        """Update the graph visualization of agent interactions"""
+                        if not self.graph_view_id:
+                            return
+                
+                        # Create a directed graph
+                        G = nx.DiGraph()
+                        
+                        # Add nodes for each agent
+                        for agent in workflow['agents']:
+                            G.add_node(agent['name'], role=agent['role'])
+                
+                        # Add edges for interactions
+                        for interaction in workflow['interactions']:
+                            G.add_edge(
+                                interaction['from'],
+                                interaction['to'],
+                                timestamp=interaction['timestamp']
+                            )
+                
+                        # Clear previous graph
+                        dpg.delete_item(self.graph_view_id, children_only=True)
+                
+                        # Create layout
+                        pos = nx.spring_layout(G)
+                        
+                        # Draw nodes
+                        for node in G.nodes():
+                            x, y = pos[node]
+                            dpg.draw_circle(
+                                center=[x * 100 + 200, y * 100 + 200],
+                                radius=20,
+                                fill=[0, 255, 0, 255],
+                                parent=self.graph_view_id
+                            )
+                            dpg.draw_text(
+                                pos=[x * 100 + 180, y * 100 + 190],
+                                text=node,
+                                parent=self.graph_view_id
+                            )
+                
+                        # Draw edges
+                        for edge in G.edges():
+                            start_pos = pos[edge[0]]
+                            end_pos = pos[edge[1]]
+                            dpg.draw_line(
+                                p1=[start_pos[0] * 100 + 200, start_pos[1] * 100 + 200],
+                                p2=[end_pos[0] * 100 + 200, end_pos[1] * 100 + 200],
+                                color=[255, 255, 255, 255],
+                                parent=self.graph_view_id
+                            )
+                
+                    def update_timeline_view(self, workflow: Dict):
+                        """Update the timeline visualization of agent activities"""
+                        if not self.timeline_view_id:
+                            return
+                
+                        # Clear previous timeline
+                        dpg.delete_item(self.timeline_view_id, children_only=True)
+                
+                        # Sort interactions by timestamp
+                        interactions = sorted(
+                            workflow['interactions'],
+                            key=lambda x: datetime.fromisoformat(x['timestamp'])
+                        )
+                
+                        # Calculate timeline dimensions
+                        timeline_start = datetime.fromisoformat(interactions[0]['timestamp'])
+                        timeline_end = datetime.fromisoformat(interactions[-1]['timestamp'])
+                        total_duration = (timeline_end - timeline_start).total_seconds()
+                
+                        # Draw timeline base
+                        dpg.draw_line(
+                            p1=[50, 250],
+                            p2=[550, 250],
+                            color=[255, 255, 255, 255],
+                            parent=self.timeline_view_id
+                        )
+                
+                        # Draw interactions on timeline
+                        for idx, interaction in enumerate(interactions):
+                            timestamp = datetime.fromisoformat(interaction['timestamp'])
+                            position = (timestamp - timeline_start).total_seconds() / total_duration
+                            x_pos = 50 + position * 500
+                
+                            # Draw marker
+                            dpg.draw_circle(
+                                center=[x_pos, 250],
+                                radius=5,
+                                fill=[0, 255, 0, 255],
+                                parent=self.timeline_view_id
+                            )
+                
+                            # Draw label
+                            dpg.draw_text(
+                                pos=[x_pos - 20, 260],
+                                text=f"{interaction['from']} → {interaction['to']}",
+                                parent=self.timeline_view_id
+                            )
+                
+                    def register_workflow(self, workflow_id: str, workflow_data: Dict):
+                        """Register a new workflow to be monitored"""
+                        self.active_workflows[workflow_id] = workflow_data
+                        if not self.selected_workflow_id:
+                            self.selected_workflow_id = workflow_id
+                            self.update_views()
+                
+                    def update_workflow(self, workflow_id: str, workflow_data: Dict):
+                        """Update an existing workflow's data"""
+                        if workflow_id in self.active_workflows:
+                            self.active_workflows[workflow_id] = workflow_data
+                            if workflow_id == self.selected_workflow_id:
+                                self.update_views()                ==================================================
+
+        📁 agents
+            📄 __init__.py
+                File Contents:
+                ==================================================
+                # src/agents/__init__.py
+                from .base import BaseAssistantAgent
+                from .specialized import (
+                    ResearchAgent,
+                    CodeExpertAgent,
+                    DataVisualizationAgent,
+                    ProjectManagerAgent,
+                    QAAgent,
+                    TeamManager
+                )
+                from .user_proxy import EnhancedUserProxy
+                from .web_agent import WebResearchAgent
+                
+                __all__ = [
+                    'BaseAssistantAgent',
+                    'ResearchAgent',
+                    'CodeExpertAgent',
+                    'DataVisualizationAgent',
+                    'ProjectManagerAgent',
+                    'QAAgent',
+                    'TeamManager',
+                    'EnhancedUserProxy',
+                    'WebResearchAgent',
+                ]                ==================================================
+
+            📄 base.py
+                File Contents:
+                ==================================================
+                # src/agents/base.py
+                from typing import Optional, Dict
+                from autogen import AssistantAgent, ConversableAgent
+                from ..config import SystemConfig
+                
+                class BaseAssistantAgent(AssistantAgent):
+                    """Base class for all assistant agents with common functionality"""
+                    def __init__(
+                        self,
+                        name: str,
+                        system_message: str,
+                        config: SystemConfig
+                    ):
+                        super().__init__(
+                            name=name,
+                            system_message=system_message,
+                            llm_config={"config_list": config.llm_config_list}
+                        )
+                        self.config = config
+                
+                    def save_response(self, response: str, filename: str):
+                        """Save agent response to file"""
+                        with open(filename, 'a') as f:
+                            f.write(f"\n{self.name}: {response}\n")                ==================================================
+
+            📄 monitored_agent.py
+                File Contents:
+                ==================================================
+                from autogen import ConversableAgent, GroupChat, GroupChatManager
+                from typing import Dict, List
+                import uuid
+                from datetime import datetime
+                
+                class MonitoredAgent(ConversableAgent):
+                    def __init__(self, name: str, role: str, **kwargs):
+                        super().__init__(name=name, **kwargs)
+                        self.role = role
+                        self.workflow_id = None
+                        self.monitor = None
+                
+                    def send(self, message, recipient, request_reply=True, silent=False):
+                        """Override send to log interactions"""
+                        if self.monitor and self.workflow_id:
+                            interaction = {
+                                'from': self.name,
+                                'to': recipient.name,
+                                'timestamp': datetime.utcnow().isoformat(),
+                                'message': message
+                            }
+                            self.monitor.log_interaction(self.workflow_id, interaction)
+                        
+                        return super().send(message, recipient, request_reply, silent)
+                
+                class TeamConfiguration:
+                    def __init__(self, monitor):
+                        self.monitor = monitor
+                        self.workflow_id = str(uuid.uuid4())
+                
+                    def create_research_team(self) -> GroupChat:
+                        """Create a research-focused team configuration"""
+                        
+                        # Create specialized agents
+                        researcher = MonitoredAgent(
+                            name="Researcher",
+                            role="Primary Researcher",
+                            system_message="You are a thorough researcher who excels at breaking down complex topics.",
+                            monitor=self.monitor
+                        )
+                
+                        analyst = MonitoredAgent(
+                            name="Analyst",
+                            role="Data Analyst",
+                            system_message="You analyze and interpret data, creating clear visualizations and insights.",
+                            monitor=self.monitor
+                        )
+                
+                        writer = MonitoredAgent(
+                            name="Writer",
+                            role="Technical Writer",
+                            system_message="You translate complex technical information into clear, accessible content.",
+                            monitor=self.monitor
+                        )
+                
+                        reviewer = MonitoredAgent(
+                            name="Reviewer",
+                            role="Quality Reviewer",
+                            system_message="You review outputs for accuracy, clarity, and completeness.",
+                            monitor=self.monitor
+                        )
+                
+                        # Set workflow ID for all agents
+                        for agent in [researcher, analyst, writer, reviewer]:
+                            agent.workflow_id = self.workflow_id
+                
+                        # Create group chat with specific interaction rules
+                        groupchat = GroupChat(
+                            agents=[researcher, analyst, writer, reviewer],
+                            messages=[],
+                            max_round=50,
+                            speaker_selection_method="round_robin",
+                            allow_repeat_speaker=False,
+                            speaker_transitions_type="allowed",
+                            allowed_or_disallowed_speaker_transitions={
+                                researcher: [analyst, writer],
+                                analyst: [writer, reviewer],
+                                writer: [reviewer, researcher],
+                                reviewer: [researcher, analyst]
+                            }
+                        )
+                
+                        # Register the workflow with the monitor
+                        self.monitor.register_workflow(
+                            self.workflow_id,
+                            {
+                                'agents': [
+                                    {'name': agent.name, 'role': agent.role}
+                                    for agent in groupchat.agents
+                                ],
+                                'interactions': []
+                            }
+                        )
+                
+                        return groupchat
+                
+                    def create_development_team(self) -> GroupChat:
+                        """Create a software development-focused team configuration"""
+                        
+                        # Create specialized agents
+                        architect = MonitoredAgent(
+                            name="Architect",
+                            role="System Architect",
+                            system_message="You design high-level software architecture and make key technical decisions.",
+                            monitor=self.monitor
+                        )
+                
+                        developer = MonitoredAgent(
+                            name="Developer",
+                            role="Software Developer",
+                            system_message="You implement solutions following best practices and design patterns.",
+                            monitor=self.monitor
+                        )
+                
+                        tester = MonitoredAgent(
+                            name="Tester",
+                            role="QA Engineer",
+                            system_message="You ensure code quality through thorough testing and validation.",
+                            monitor=self.monitor
+                        )
+                
+                        devops = MonitoredAgent(
+                            name="DevOps",
+                            role="DevOps Engineer",
+                            system_message="You handle deployment, infrastructure, and operational concerns.",
+                            monitor=self.monitor
+                        )
+                
+                        # Set workflow ID for all agents
+                        for agent in [architect, developer, tester, devops]:
+                            agent.workflow_id = self.workflow_id
+                
+                        # Create group chat with specific interaction rules
+                        groupchat = GroupChat(
+                            agents=[architect, developer, tester, devops],
+                            messages=[],
+                            max_round=50,
+                            speaker_selection_method="round_robin",
+                            allow_repeat_speaker=False,
+                            speaker_transitions_type="allowed",
+                            allowed_or_disallowed_speaker_transitions={
+                                architect: [developer, devops],
+                                developer: [tester, architect],
+                                tester: [developer, devops],
+                                devops: [architect, developer]
+                            }
+                        )
+                
+                        # Register the workflow with the monitor
+                        self.monitor.register_workflow(
+                            self.workflow_id,
+                            {
+                                'agents': [
+                                    {'name': agent.name, 'role': agent.role}
+                                    for agent in groupchat.agents
+                                ],
+                                'interactions': []
+                            }
+                        )
+                
+                        return groupchat                ==================================================
+
+            📄 specialized.py
+                File Contents:
+                ==================================================
+                # src/agents/specialized.py
+                from typing import Dict, List, Optional
+                from autogen import AssistantAgent, ConversableAgent
+                from autogen import GroupChat, GroupChatManager
+                
+                
+                from src.agents.base import BaseAssistantAgent
+                from ..config import SystemConfig
+                
+                class ResearchAgent(AssistantAgent):
+                    """Specializes in academic research and paper analysis"""
+                    def __init__(self, config: SystemConfig):
+                        super().__init__(
+                            name="research_assistant",
+                            system_message="""You are a research specialist focused on analyzing academic papers and research findings.
+                            Your strengths include:
+                            1. Summarizing complex research papers
+                            2. Identifying key findings and methodologies
+                            3. Comparing different research approaches
+                            4. Suggesting relevant papers and citations
+                            
+                            Always structure your responses clearly and cite sources when available.
+                            Include links to papers when possible.""",
+                            llm_config={"config_list": config.llm_config_list}
+                        )
+                
+                class CodeExpertAgent(AssistantAgent):
+                    """Specializes in code analysis, optimization, and best practices"""
+                    def __init__(self, config: SystemConfig):
+                        super().__init__(
+                            name="code_expert",
+                            system_message="""You are a code expert specialized in:
+                            1. Code review and optimization
+                            2. Best practices and design patterns
+                            3. Performance analysis
+                            4. Security review
+                            
+                            When analyzing code:
+                            1. First identify potential issues
+                            2. Suggest specific improvements
+                            3. Provide example code when helpful
+                            4. Consider both functionality and maintainability""",
+                            llm_config={"config_list": config.llm_config_list}
+                        )
+                
+                class DataVisualizationAgent(AssistantAgent):
+                    """Specializes in creating and explaining data visualizations"""
+                    def __init__(self, config: SystemConfig):
+                        super().__init__(
+                            name="visualization_expert",
+                            system_message="""You are a data visualization specialist who excels at:
+                            1. Creating clear and informative visualizations
+                            2. Choosing appropriate chart types
+                            3. Color theory and accessibility
+                            4. Interactive visualization design
+                            
+                            Always consider:
+                            1. The target audience
+                            2. The story the data tells
+                            3. Best practices in visualization
+                            4. Performance and interactivity""",
+                            llm_config={"config_list": config.llm_config_list}
+                        )
+                
+                class ProjectManagerAgent(AssistantAgent):
+                    """Coordinates tasks and manages workflow between agents"""
+                    def __init__(self, config: SystemConfig):
+                        super().__init__(
+                            name="project_manager",
+                            system_message="""You are a project manager responsible for:
+                            1. Task coordination between different agents
+                            2. Workflow optimization
+                            3. Progress tracking
+                            4. Resource allocation
+                            
+                            Your role is to:
+                            1. Break down complex tasks
+                            2. Assign work to appropriate specialists
+                            3. Monitor progress and handle blockers
+                            4. Ensure quality and completeness""",
+                            llm_config={"config_list": config.llm_config_list}
+                        )
+                
+                class QAAgent(AssistantAgent):
+                    """Specializes in testing and quality assurance"""
+                    def __init__(self, config: SystemConfig):
+                        super().__init__(
+                            name="qa_expert",
+                            system_message="""You are a QA specialist focused on:
+                            1. Test case design
+                            2. Edge case identification
+                            3. Performance testing
+                            4. User experience testing
+                            
+                            Always:
+                            1. Think about potential failure modes
+                            2. Consider different user scenarios
+                            3. Verify requirements are met
+                            4. Document test results clearly""",
+                            llm_config={"config_list": config.llm_config_list}
+                        )
+                
+                
+                class TeamManager:
+                    """Manages a team of specialized agents"""
+                    def __init__(self, config: SystemConfig, executor):
+                        self.config = config
+                        self.executor = executor
+                        self.agents = self._initialize_agents()
+                        
+                    def _initialize_agents(self) -> Dict[str, BaseAssistantAgent]:
+                        """Initialize all specialized agents"""
+                        return {
+                            "research": ResearchAgent(self.config),
+                            "code": CodeExpertAgent(self.config),
+                            "viz": DataVisualizationAgent(self.config),
+                            "pm": ProjectManagerAgent(self.config),
+                            "qa": QAAgent(self.config)
+                        }
+                    
+                    def get_agent(self, role: str) -> Optional[BaseAssistantAgent]:
+                        """Get an agent by their role"""
+                        return self.agents.get(role)
+                    
+                    def get_all_agents(self) -> List[BaseAssistantAgent]:
+                        """Get all agents"""
+                        return list(self.agents.values())
+                
+                    def execute_group_task(
+                        self, 
+                        task_description: str, 
+                        agents: List[BaseAssistantAgent],
+                        max_rounds: int = 10
+                    ) -> Dict:
+                        """
+                        Execute a task using a group of agents.
+                        
+                        Args:
+                            task_description: Description of the task to be executed
+                            agents: List of agents to participate in the task
+                            max_rounds: Maximum number of conversation rounds
+                            
+                        Returns:
+                            Dict containing execution results and conversation history
+                        """
+                        # Ensure we have at least one agent
+                        if not agents:
+                            raise ValueError("At least one agent is required for group task execution")
+                            
+                        # Add project manager if not present
+                        if self.agents["pm"] not in agents:
+                            agents = [self.agents["pm"]] + list(agents)
+                            
+                        # Create group chat
+                        groupchat = GroupChat(
+                            agents=agents,
+                            messages=[],
+                            max_round=max_rounds,
+                            speaker_selection_method="auto",
+                        )
+                        
+                        # Create chat manager
+                        manager = GroupChatManager(
+                            groupchat=groupchat,
+                            llm_config={"config_list": self.config.llm_config_list},
+                            system_message=f"""Coordinate the completion of this task:
+                            {task_description}
+                            
+                            Ensure each agent contributes according to their expertise.
+                            The project manager should coordinate the overall effort.
+                            Verify results before marking the task as complete."""
+                        )
+                        
+                        try:
+                            # Start the group chat
+                            chat_result = agents[0].initiate_chat(
+                                manager,
+                                message=f"""Task Description:
+                                {task_description}
+                                
+                                Please work together to complete this task. Each agent should contribute
+                                based on their expertise. Begin by analyzing the requirements and creating
+                                a plan of action.""",
+                            )
+                            
+                            # Process results
+                            result = {
+                                "success": True,
+                                "chat_history": groupchat.messages,
+                                "summary": chat_result.summary if hasattr(chat_result, 'summary') else None,
+                                "cost": chat_result.cost if hasattr(chat_result, 'cost') else None,
+                                "participants": [agent.name for agent in agents]
+                            }
+                            
+                        except Exception as e:
+                            result = {
+                                "success": False,
+                                "error": str(e),
+                                "chat_history": groupchat.messages if 'groupchat' in locals() else [],
+                                "participants": [agent.name for agent in agents]
+                            }
+                            
+                        return result
+                
+                    def execute_sequential_tasks(
+                        self, 
+                        tasks: List[Dict],
+                        required_agents: List[str]
+                    ) -> List[Dict]:
+                        """
+                        Execute a sequence of related tasks.
+                        
+                        Args:
+                            tasks: List of task descriptions and requirements
+                            required_agents: List of agent roles required for the tasks
+                            
+                        Returns:
+                            List of execution results for each task
+                        """
+                        results = []
+                        
+                        # Get required agents
+                        agents = [
+                            self.get_agent(role)
+                            for role in required_agents
+                            if self.get_agent(role) is not None
+                        ]
+                        
+                        # Execute each task in sequence
+                        for task in tasks:
+                            result = self.execute_group_task(
+                                task_description=task["description"],
+                                agents=agents,
+                                max_rounds=task.get("max_rounds", 10)
+                            )
+                            results.append(result)
+                            
+                            # Break if a task fails
+                            if not result["success"]:
+                                break
+                                
+                        return results                ==================================================
+
+            📄 user_proxy.py
+                File Contents:
+                ==================================================
+                # src/agents/user_proxy.py
+                from typing import Optional, Dict
+                from autogen import UserProxyAgent
+                from ..config import SystemConfig
+                
+                class EnhancedUserProxy(UserProxyAgent):
+                    """Enhanced user proxy with better termination handling and history"""
+                    def __init__(self, name: str, executor, human_input_mode: str = "TERMINATE"):
+                        super().__init__(
+                            name=name,
+                            code_execution_config={"executor": executor},
+                            human_input_mode=human_input_mode,
+                            is_termination_msg=self._is_termination_msg
+                        )
+                        self.conversation_history = []
+                        
+                    def _is_termination_msg(self, msg: Dict) -> bool:
+                        """Check if message indicates task completion"""
+                        if not msg.get("content"):
+                            return False
+                            
+                        content = msg["content"].upper()
+                        return any(phrase in content for phrase in [
+                            "TERMINATE",
+                            "TASK_COMPLETED",
+                            "TASK TERMINATED BY USER"
+                        ])
+                
+                    def generate_reply(self, messages: list, sender: Optional[object] = None, **kwargs):
+                        """Generate reply with history tracking"""
+                        try:
+                            reply = super().generate_reply(messages, sender, **kwargs)
+                            
+                            # Store in history if it's not a termination message
+                            if not self._is_termination_msg({"content": reply}):
+                                self.conversation_history.append({
+                                    "sender": sender.name if sender else "system",
+                                    "message": messages[-1]["content"],
+                                    "reply": reply
+                                })
+                            return reply
+                            
+                        except Exception as e:
+                            print(f"\nError during reply generation: {str(e)}")
+                            return f"Error occurred: {str(e)}"                ==================================================
+
+            📄 web_agent.py
+                File Contents:
+                ==================================================
+                # src/agents/web_agent.py
+                from typing import Dict
+                
+                from tools.web_search import WebSearchTool
+                from .base import BaseAssistantAgent
+                
+                class WebResearchAgent(BaseAssistantAgent):
+                    """Agent specialized in web research with integrated search capabilities"""
+                    def __init__(self, config):
+                        super().__init__(
+                            name="web_researcher",
+                            system_message="""You are a web research specialist who can:
+                            1. Search for recent academic papers and research
+                            2. Analyze and summarize findings
+                            3. Compare different sources
+                            4. Identify key trends and developments
+                            
+                            Always cite sources and provide links when available.""",
+                            config=config
+                        )
+                        self.search_tool = WebSearchTool()
+                    
+                    def research(self, query: str) -> Dict:
+                        """Perform research on a given query"""
+                        return self.search_tool.summarize_research(query)                ==================================================
+
