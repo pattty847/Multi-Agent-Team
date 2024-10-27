@@ -24,8 +24,8 @@ graph TD
         C3 --> C4[State Manager]
     end
 ```
-
-This project is a multi-agent system designed to assist with coding, analysis, and research tasks. It leverages AI to interact with users, execute code, and perform web searches for research papers. The system now includes an intuitive drag-and-drop interface for designing workflows and monitoring their progress in real-time.
+### North Star Vision
+The north star for this project is to create a robust multi-agent system that efficiently manages and executes complex tasks through a well-coordinated team of specialized agents. The system should provide a seamless user experience through an intuitive UI, allowing users to design, monitor, and optimize workflows in real time. The team orchestrator will play a crucial role in dynamically adapting to task requirements and agent capabilities, ensuring optimal performance and task completion.
 
 Special thanks to GPT and Claude <3
 
