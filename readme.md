@@ -1,5 +1,29 @@
 # Multi-Agent System Project
 ![image](https://github.com/user-attachments/assets/374003b2-31f8-43d5-be7c-432ab63a4edf)
+```mermaid
+graph TD
+    A[User Interface Layer] --> B[Orchestration Layer]
+    B --> C[Agent Management Layer]
+    C --> D[Docker Container Layer]
+    
+    subgraph "User Interface Layer"
+        A1[Agent Designer] --> A2[Workflow Monitor]
+        A2 --> A3[Performance Metrics]
+        A3 --> A4[Intervention Tools]
+    end
+
+    subgraph "Orchestration Layer"
+        B1[Team Manager] --> B2[Task Decomposer]
+        B2 --> B3[Progress Monitor]
+        B3 --> B4[Intervention Handler]
+    end
+
+    subgraph "Agent Management Layer"
+        C1[AutoGen Integration] --> C2[Agent Registry]
+        C2 --> C3[Communication Bus]
+        C3 --> C4[State Manager]
+    end
+```
 
 This project is a multi-agent system designed to assist with coding, analysis, and research tasks. It leverages AI to interact with users, execute code, and perform web searches for research papers. The system now includes an intuitive drag-and-drop interface for designing workflows and monitoring their progress in real-time.
 
