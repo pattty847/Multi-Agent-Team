@@ -1,16 +1,23 @@
+# At the top of monitor.py
+import dearpygui.dearpygui as dpg
 import logging
 import queue
-import threading
+import psutil
 import time
-import dearpygui.dearpygui as dpg
-from typing import Dict, List, Optional
-import networkx as nx
-import math
 from datetime import datetime
+from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass
+from collections import defaultdict
+import docker
 import tkinter as tk
+import math
 
-from src.config import SystemConfig
-from src.workflow_manager import WorkflowManager
+from src.core.config import SystemConfig
+from src.core.workflow import WorkflowManager
+
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 
 def get_screen_size_percentage(percentage=0.80):
     # Create a root window and hide it
@@ -32,97 +39,216 @@ def get_screen_size_percentage(percentage=0.80):
 
 logger = logging.getLogger(__name__)
 
-class AgentMonitor:
+# src/ui/monitor.py
+
+import dearpygui.dearpygui as dpg
+import logging
+import queue
+import psutil
+import time
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass
+import docker
+
+from src.core.config import SystemConfig
+from src.core.workflow import WorkflowManager
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class AgentState:
+    """Represents the current state of an agent with enhanced type tracking"""
+    name: str
+    agent_type: str  # "Research", "Code", "Viz", "QA", "PM"
+    role: str
+    status: str
+    tasks_completed: int
+    memory_usage: float
+    cpu_usage: float
+    last_active: datetime
+    position: Tuple[int, int] = (0, 0)
+    current_task: Optional[str] = None
+    specialization: Optional[str] = None
+    performance_metrics: Dict[str, Any] = None
+
+    @property
+    def display_name(self) -> str:
+        """Returns a formatted display name including the agent type"""
+        return f"{self.name} ({self.agent_type})"
+
+class AgentMonitoringSystem:
+    """Main monitoring system that handles UI and agent tracking"""
+    
     def __init__(self, config: SystemConfig):
+        # Add debug logging
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
+        
+        # Create a console handler
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
+        
+        
+        # Basic state
+        self.config = config
         self.message_queue = queue.Queue()
-        self.agents: Dict[str, Dict] = {}
-        self.workflows: Dict[str, Dict] = {}  # Single workflow store
+        self.agents: Dict[str, AgentState] = {}
+        self.workflows: Dict[str, Dict] = {}
         self.selected_workflow_id: Optional[str] = None
         
-        # View IDs
-        self.graph_view: Optional[int] = None
-        self.timeline_view: Optional[int] = None
-        self.message_log: Optional[int] = None
-        
-        # Performance metrics
+        # Performance tracking
+        self.agent_performance = defaultdict(list)
         self.metrics = {
             "messages_processed": 0,
             "active_workflows": 0,
             "tasks_completed": 0
         }
         
+        # Specialized agent tracking
+        self.research_agents = {}
+        self.code_agents = {}
+        self.viz_agents = {}
+        self.qa_agents = {}
+        self.pm_agents = {}
+        
+        self.agent_type_colors = {
+            "Research": (0, 150, 255, 255),  # Blue
+            "Code": (0, 255, 150, 255),      # Green
+            "Viz": (255, 150, 0, 255),       # Orange
+            "QA": (255, 0, 150, 255),        # Pink
+            "PM": (150, 0, 255, 255)         # Purple
+        }
+        
+        # Initialize components
+        self.workflow_manager = WorkflowManager(config, self.message_queue)
+        self.docker_client = docker.from_env()
+        
+        # UI state
         self.width, self.height = get_screen_size_percentage()
         
-        # Create context
-        dpg.create_context()
-        
-        self.workflow_manager = WorkflowManager(config, self.message_queue)
-    
+        logging.info("AgentMonitoringSystem setup.")
+
+    def setup_ui(self):
+        """Initialize the monitoring UI"""
+        try:
+            self.logger.debug("Starting UI setup")
+            
+            # Setup main window
+            with dpg.window(label="Agent Monitor", tag="primary_window", width=-1, height=-1):
+                self.logger.debug("Created primary window")
+                
+                with dpg.group(horizontal=True):
+                    # Left panel - Controls and Status (25% of width)
+                    left_width = int(self.width * 0.25)
+                    with dpg.child_window(width=left_width, height=-1):
+                        self._setup_control_panel()
+                        self._setup_agent_list()
+                    
+                    with dpg.child_window(width=-1, height=-1):
+                        with dpg.tab_bar():
+                            with dpg.tab(label="Workflow View"):
+                                self._setup_node_editor()
+                            with dpg.tab(label="Metrics"):
+                                # self._setup_metrics_view()
+                                pass
+                            with dpg.tab(label="Message Log"):
+                                self._setup_message_log()
+                                pass
+            
+            self.logger.debug("UI setup complete")
+            
+            # Set as primary window
+            dpg.set_primary_window("primary_window", True)
+            
+        except Exception as e:
+            self.logger.error(f"Error in setup_ui: {str(e)}")
+            raise
+
     def _setup_control_panel(self):
         """Setup workflow control panel"""
         with dpg.collapsing_header(label="Workflow Control", default_open=True):
-            # Add workflow type selector
             dpg.add_combo(
-                items=["research", "development"],
+                items=["research", "development", "viz"],
                 label="Workflow Type",
                 default_value="research",
-                width=-1,
                 tag="workflow_type"
             )
             
-            # Add task input
             dpg.add_input_text(
                 label="Task Description",
                 multiline=True,
                 height=100,
-                width=-1,
                 tag="task_input"
             )
             
-            # Add control buttons with some spacing
-            dpg.add_spacing(count=5)
-            dpg.add_button(
-                label="Start New Workflow",
-                callback=self.start_new_workflow,
-                width=-1
-            )
-            dpg.add_spacing(count=2)
-            dpg.add_button(
-                label="Stop Selected",
-                callback=self.stop_selected_workflow,
-                width=-1
-            )
-            dpg.add_spacing(count=2)
-            dpg.add_button(
-                label="Clear Completed",
-                # callback=self.clear_completed_workflows,
-                width=-1
-            )
-    
-    def start_new_workflow(self, sender, app_data):
-        """Start a new agent workflow"""
+            with dpg.group(horizontal=True):
+                dpg.add_button(
+                    label="Start New Workflow",
+                    callback=self.start_new_workflow,
+                )
+                
+                dpg.add_button(
+                    label="Stop Selected",
+                    callback=self.stop_selected_workflow,
+                )
+
+    def run(self):
+        """Main application loop"""
         try:
-            workflow_type = dpg.get_value("workflow_type")
-            task = dpg.get_value("task_input")
+            self.logger.debug("Starting main loop")
+            last_performance_update = time.time()
             
-            if not task.strip():
-                logger.warning("Task description required")
-                return
-            
-            # Create and start workflow
-            workflow_id = self.workflow_manager.create_workflow(
-                workflow_type=workflow_type,
-                task=task
-            )
-            self.workflow_manager.start_workflow(workflow_id)
-            
-            # Clear input
-            dpg.set_value("task_input", "")
-            
-            logger.info(f"Started new {workflow_type} workflow: {workflow_id}")
-            
+            while dpg.is_dearpygui_running():
+                try:
+                    # Process messages
+                    while not self.message_queue.empty():
+                        msg = self.message_queue.get_nowait()
+                        self.process_message(msg)
+                    
+                    # Update performances every second
+                    current_time = time.time()
+                    if current_time - last_performance_update >= 1.0:
+                        self.update_agent_performances()
+                        last_performance_update = current_time
+                    
+                    # Update other metrics and UI
+                    self.update_metrics()
+                    
+                except queue.Empty:
+                    pass
+                except Exception as e:
+                    self.logger.error(f"Error in main loop: {str(e)}")
+                
+                dpg.render_dearpygui_frame()
+                
         except Exception as e:
-            logger.error(f"Error starting workflow: {e}")
+            self.logger.error(f"Error in run method: {str(e)}")
+            raise
+        
+    def update_agent_performances(self):
+        """Update performance metrics for all agents"""
+        for agent_name, agent in self.agents.items():
+            try:
+                # Update CPU and memory usage (example values - replace with actual monitoring)
+                agent.cpu_usage = psutil.cpu_percent(interval=0.1)
+                agent.memory_usage = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+                
+                # Update performance history
+                if not hasattr(agent, 'performance_history'):
+                    agent.performance_history = [0.0] * 100
+                
+                # Add new value and maintain fixed length
+                agent.performance_history = agent.performance_history[1:] + [agent.cpu_usage]
+                
+                # Update the node
+                self._update_agent_node(agent)
+                
+            except Exception as e:
+                self.logger.error(f"Error updating agent {agent_name} performance: {e}")
     
     def stop_selected_workflow(self, sender, app_data):
         """Stop the currently selected workflow"""
@@ -132,45 +258,6 @@ class AgentMonitor:
                 logger.info(f"Stopped workflow {self.selected_workflow_id}")
             except Exception as e:
                 logger.error(f"Error stopping workflow: {e}")
-
-    def setup_ui(self):
-        """Initialize the monitoring UI components"""
-        # Create viewport
-        dpg.create_viewport(
-            title="Agent Monitoring System",
-            width=self.width,
-            height=self.height
-        )
-
-        # Setup theme
-        with dpg.theme() as global_theme:
-            with dpg.theme_component(dpg.mvAll):
-                dpg.add_theme_color(dpg.mvThemeCol_WindowBg, (15, 15, 15))
-                dpg.add_theme_color(dpg.mvThemeCol_TitleBg, (30, 30, 30))
-                dpg.add_theme_color(dpg.mvThemeCol_TitleBgActive, (40, 40, 40))
-                dpg.add_theme_color(dpg.mvThemeCol_Button, (50, 50, 50))
-                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (70, 70, 70))
-                dpg.add_theme_color(dpg.mvThemeCol_Text, (255, 255, 255))
-        
-        dpg.bind_theme(global_theme)
-        
-        # Create main window
-        with dpg.window(label="Agent Monitor", tag="primary_window"):
-            with dpg.group(horizontal=True):
-                # Left panel - Controls and Status (25% of width)
-                left_width = int(self.width * 0.25)
-                with dpg.child_window(width=left_width, height=self.height-50):
-                    self._setup_control_panel()  # Now being called
-                    self._setup_agent_list()
-                
-                # Right panel - Visualizations (75% of width)
-                right_width = int(self.width * 0.75)
-                with dpg.child_window(width=right_width, height=self.height-50):
-                    pass
-                    # self._setup_visualization_tabs()
-
-        # Set primary window
-        dpg.set_primary_window("primary_window", True)
     
     def _setup_status_panel(self):
         """Setup system status panel"""
@@ -179,23 +266,6 @@ class AgentMonitor:
             dpg.add_text("Active Workflows: 0", tag="active_workflows_text")
             dpg.add_text("Messages: 0", tag="messages_text")
             dpg.add_text("Uptime: 00:00:00", tag="uptime_text")
-
-    def _setup_agent_list(self):
-        """Setup agent list panel"""
-        with dpg.collapsing_header(label="Agent List", default_open=True):
-            dpg.add_listbox(
-                tag="agent_list",
-                items=[],
-                num_items=10,
-                callback=self.select_agent,
-                width=-1
-            )
-            with dpg.group(horizontal=True):
-                dpg.add_button(
-                    label="View Details",
-                    callback=self.view_agent_details,
-                    width=-1
-                )
 
     def _setup_visualization_tabs(self):
         """Setup visualization tabs"""
@@ -255,17 +325,6 @@ class AgentMonitor:
             
         dpg.configure_item("agent_details_text", default_value=details)
         dpg.show_item("agent_details_window")
-
-    def start_new_workflow(self, sender, app_data):
-        """Start a new agent workflow"""
-        logger.info("Starting new workflow")
-        # Implementation here - safe to call from UI thread
-
-    def stop_selected_workflow(self, sender, app_data):
-        """Stop the currently selected workflow"""
-        if self.selected_workflow_id:
-            logger.info(f"Stopping workflow {self.selected_workflow_id}")
-            # Implementation here - safe to call from UI thread
 
     def select_agent(self, sender, app_data):
         """Handle agent selection from the list"""
@@ -461,54 +520,637 @@ class AgentMonitor:
             self.active_workflows[workflow_id] = workflow_data
             if workflow_id == self.selected_workflow_id:
                 self.update_views()
-
-    def run(self):
-        """Main application loop using DearPyGui's render loop"""
-        # Setup and show viewport
-        dpg.setup_dearpygui()
-        dpg.show_viewport()
-
-        # Main loop
-        while dpg.is_dearpygui_running():
-            # Process any messages in queue
-            try:
-                while not self.message_queue.empty():
-                    msg = self.message_queue.get_nowait()
-                    self.process_message(msg)
-            except queue.Empty:
-                pass
-
-            # Update UI
-            self.update_metrics()
-            self.update_graph()
+                
+    def _setup_node_editor(self):
+        """Setup the node editor for agent visualization"""
+        with dpg.node_editor(
+            callback=self._on_node_connect,
+            delink_callback=self._on_node_disconnect,
+            minimap=True,
+            minimap_location=dpg.mvNodeMiniMap_Location_BottomRight,
+            tag="agent_node_editor"
+        ):
+            # Node editor will be populated dynamically
+            pass
             
-            # Render frame
-            dpg.render_dearpygui_frame()
+        # Add a tooltip to explain controls
+        # with dpg.tooltip(parent="agent_node_editor"):
+        #     dpg.add_text("Ctrl+Click to remove connections\nDrag nodes to reposition")
 
-        # Cleanup
-        dpg.destroy_context()
 
-def main():
-    # Setup logging
-    logging.basicConfig(level=logging.INFO)
+    def _add_agent_node(self, agent: AgentState):
+        """Add a new agent node to the editor with proper styling and attributes"""
+        
+        # Generate unique node ID
+        node_id = f"node_{agent.name}"
+        
+        # Calculate initial position if not set
+        if agent.position == (0, 0):
+            num_nodes = len(self.agents)
+            x = 100 + (num_nodes % 3) * 250  # 3 columns
+            y = 100 + (num_nodes // 3) * 200  # 200px vertical spacing
+            agent.position = (x, y)
+
+        # Create node theme with agent-type specific colors
+        with dpg.theme() as node_theme:
+            with dpg.theme_component(dpg.mvNode):
+                color = self.agent_type_colors.get(agent.agent_type, (150, 150, 150, 255))
+                dpg.add_theme_color(dpg.mvNodeCol_TitleBar, color, category=dpg.mvThemeCat_Nodes)
+                dpg.add_theme_color(dpg.mvNodeCol_NodeOutline, color, category=dpg.mvThemeCat_Nodes)
+
+        # Create the node
+        with dpg.node(
+            label=f"{agent.agent_type} Agent: {agent.name}",
+            tag=node_id,
+            parent="agent_node_editor",
+            pos=agent.position
+        ):
+            # Bind the theme
+            dpg.bind_item_theme(node_id, node_theme)
+            
+            # Input attribute for receiving connections
+            with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Input, tag=f"input_{agent.name}"):
+                dpg.add_text("Input")
+                
+            # Static attributes for agent info
+            with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
+                # Status indicator with color
+                status_colors = {
+                    "active": [0, 255, 0, 255],    # Green
+                    "idle": [150, 150, 150, 255],  # Gray
+                    "busy": [255, 165, 0, 255],    # Orange
+                    "error": [255, 0, 0, 255]      # Red
+                }
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Status: ")
+                    dpg.add_text(
+                        agent.status,
+                        tag=f"status_text_{agent.name}",
+                        color=status_colors.get(agent.status.lower(), [255, 255, 255, 255])
+                    )
+
+                # Add current task
+                dpg.add_text("Current Task:", tag=f"task_label_{agent.name}")
+                dpg.add_text(
+                    agent.current_task or "None",
+                    tag=f"task_text_{agent.name}",
+                    wrap=300
+                )
+
+                # Add performance metrics
+                with dpg.group(horizontal=True):
+                    dpg.add_text("CPU: ")
+                    dpg.add_text(
+                        f"{agent.cpu_usage:.1f}%",
+                        tag=f"cpu_text_{agent.name}"
+                    )
+                
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Memory: ")
+                    dpg.add_text(
+                        f"{agent.memory_usage:.1f}MB",
+                        tag=f"memory_text_{agent.name}"
+                    )
+
+                # Add mini performance plot
+                dpg.add_simple_plot(
+                    label="Performance",
+                    default_value=(0.0,) * 100,  # Initialize with zeros
+                    width=200,
+                    height=50,
+                    tag=f"performance_plot_{agent.name}"
+                )
+
+            # Output attribute for making connections
+            with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Output, tag=f"output_{agent.name}"):
+                dpg.add_text("Output")
+
+            # Add right-click context menu
+            with dpg.popup(parent=node_id, mousebutton=dpg.mvMouseButton_Right):
+                dpg.add_menu_item(label="View Details", callback=lambda: self._view_agent_details(agent.name))
+                dpg.add_menu_item(label="Reset Position", callback=lambda: self._reset_node_position(agent.name))
+                dpg.add_menu_item(label="Focus Agent", callback=lambda: self._focus_on_node(agent.name))
     
-    try:
-        # Create and run monitor
-        monitor = AgentMonitor()
-        monitor.setup_ui()
-        # Create test data
-        monitor.message_queue.put({
-            "type": "new_agent",
-            "agent_id": "researcher_1",
-            "data": {
-                "name": "Researcher",
-                "status": "active",
-                "tasks": []
-            }
-        })
+    def _focus_on_node(self, agent_name: str):
+        """Center the node editor view on a specific agent node"""
+        node_id = f"node_{agent_name}"
+        if dpg.does_item_exist(node_id):
+            pos = dpg.get_item_pos(node_id)
+            editor_pos = dpg.get_item_pos("agent_node_editor")
+            editor_size = dpg.get_item_rect_size("agent_node_editor")
+            
+            # Calculate center position
+            center_x = editor_pos[0] + editor_size[0]/2 - pos[0]
+            center_y = editor_pos[1] + editor_size[1]/2 - pos[1]
+            
+            # Smoothly pan to the node
+            dpg.set_node_editor_panning(center_x, center_y)
 
-        # Run the monitor
-        monitor.run()
-    except Exception as e:
-        logger.error(f"Application error: {e}")
-        raise
+    
+    def _update_agent_node(self, agent: AgentState):
+        """Update an existing agent node's information with enhanced error logging"""
+        try:
+            # Get all relevant item tags before updating
+            status_tag = f"status_text_{agent.name}"
+            task_tag = f"task_text_{agent.name}"
+            cpu_tag = f"cpu_text_{agent.name}"
+            memory_tag = f"memory_text_{agent.name}"
+            plot_tag = f"performance_plot_{agent.name}"
+
+            # Log the items we're trying to update
+            self.logger.debug(f"Updating node items for agent {agent.name}: "
+                            f"status={status_tag}, task={task_tag}, "
+                            f"cpu={cpu_tag}, memory={memory_tag}, plot={plot_tag}")
+
+            # Check if items exist before updating
+            for tag in [status_tag, task_tag, cpu_tag, memory_tag, plot_tag]:
+                if not dpg.does_item_exist(tag):
+                    self.logger.error(f"Item {tag} does not exist!")
+                    continue
+
+                try:
+                    # Status update
+                    if tag == status_tag:
+                        status_colors = {
+                            "active": [0, 255, 0, 255],
+                            "idle": [150, 150, 150, 255],
+                            "busy": [255, 165, 0, 255],
+                            "error": [255, 0, 0, 255]
+                        }
+                        dpg.configure_item(
+                            tag,
+                            default_value=agent.status,
+                            color=status_colors.get(agent.status.lower(), [255, 255, 255, 255])
+                        )
+                        self.logger.debug(f"Updated status for {agent.name}: {agent.status}")
+
+                    # Task update
+                    elif tag == task_tag:
+                        dpg.configure_item(
+                            tag,
+                            default_value=agent.current_task or "None"
+                        )
+                        self.logger.debug(f"Updated task for {agent.name}: {agent.current_task}")
+
+                    # CPU update
+                    elif tag == cpu_tag:
+                        dpg.configure_item(
+                            tag,
+                            default_value=f"{agent.cpu_usage:.1f}%"
+                        )
+                        self.logger.debug(f"Updated CPU for {agent.name}: {agent.cpu_usage:.1f}%")
+
+                    # Memory update
+                    elif tag == memory_tag:
+                        dpg.configure_item(
+                            tag,
+                            default_value=f"{agent.memory_usage:.1f}MB"
+                        )
+                        self.logger.debug(f"Updated memory for {agent.name}: {agent.memory_usage:.1f}MB")
+
+                    # Performance plot update
+                    elif tag == plot_tag and hasattr(agent, 'performance_history'):
+                        dpg.configure_item(
+                            tag,
+                            default_value=agent.performance_history
+                        )
+                        self.logger.debug(f"Updated performance plot for {agent.name}")
+
+                except Exception as item_error:
+                    # Get DPG's last error
+                    dpg_error = dpg.get_text_error()
+                    self.logger.error(f"Error updating {tag} for agent {agent.name}:")
+                    self.logger.error(f"Exception: {str(item_error)}")
+                    self.logger.error(f"DPG Error: {dpg_error}")
+                    if hasattr(item_error, '__traceback__'):
+                        import traceback
+                        self.logger.error("Traceback:")
+                        self.logger.error(traceback.format_tb(item_error.__traceback__))
+
+        except Exception as e:
+            # Get DPG's last error
+            dpg_error = dpg.get_text_error()
+            self.logger.error(f"Critical error updating agent node {agent.name}:")
+            self.logger.error(f"Exception: {str(e)}")
+            self.logger.error(f"DPG Error: {dpg_error}")
+            if hasattr(e, '__traceback__'):
+                import traceback
+                self.logger.error("Traceback:")
+                self.logger.error(traceback.format_tb(e.__traceback__))
+
+    def setup_logging(self):
+        """Setup enhanced logging configuration"""
+        # Create a formatter that includes more details
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
+        )
+        
+        # Create console handler with formatter
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        
+        # Create file handler with formatter
+        file_handler = logging.FileHandler('agent_monitor.log')
+        file_handler.setFormatter(formatter)
+        
+        # Get logger and add handlers
+        self.logger = logging.getLogger(__name__)
+        self.logger.addHandler(console_handler)
+        self.logger.addHandler(file_handler)
+        self.logger.setLevel(logging.DEBUG)
+        
+        # Also log DPG version and initialization
+        self.logger.info(f"DearPyGui Version: {dpg.get_dearpygui_version()}")
+        self.logger.info("Initializing Agent Monitoring System")
+
+    def _get_role_color(self, role: str) -> tuple:
+        """Get color theme for different agent roles"""
+        colors = {
+            "research": (0, 150, 255, 255),   # Blue
+            "code": (0, 255, 150, 255),       # Green
+            "viz": (255, 150, 0, 255),        # Orange
+            "qa": (255, 0, 150, 255),         # Pink
+            "pm": (150, 0, 255, 255)          # Purple
+        }
+        return colors.get(role.lower(), (150, 150, 150, 255))
+
+    def _on_node_connect(self, sender, app_data):
+        """Handle connection between agent nodes"""
+        try:
+            # Extract source and target node IDs
+            source_attr_id, target_attr_id = app_data
+            source_agent = source_attr_id.split('_')[1]
+            target_agent = target_attr_id.split('_')[1]
+
+            # Create the link
+            link_id = dpg.add_node_link(source_attr_id, target_attr_id, parent=sender)
+
+            # Log the connection
+            self.log_message(
+                f"Connected {self.agents[source_agent].agent_type} agent '{source_agent}' to "
+                f"{self.agents[target_agent].agent_type} agent '{target_agent}'",
+                "info"
+            )
+
+            # Update workflow connections
+            if self.selected_workflow_id:
+                self._add_workflow_connection(source_agent, target_agent)
+
+        except Exception as e:
+            self.logger.error(f"Error creating node connection: {e}")
+            
+    
+    def _reset_node_position(self, agent_name: str):
+        """Reset an agent node to its default position"""
+        node_id = f"node_{agent_name}"
+        if dpg.does_item_exist(node_id):
+            num_nodes = len(self.agents)
+            x = 100 + (num_nodes % 3) * 250
+            y = 100 + (num_nodes // 3) * 200
+            dpg.set_item_pos(node_id, [x, y])
+
+    def _add_workflow_connection(self, source_agent: str, target_agent: str):
+        """Add a connection to the current workflow"""
+        if self.selected_workflow_id and self.selected_workflow_id in self.workflows:
+            workflow = self.workflows[self.selected_workflow_id]
+            workflow['connections'].append({
+                'from': source_agent,
+                'to': target_agent,
+                'timestamp': datetime.now().isoformat()
+            })
+
+    def _on_node_disconnect(self, sender, app_data):
+        """Handle disconnection between agent nodes"""
+        try:
+            # Extract node IDs from attribute IDs
+            from_node = app_data[0].split('_')[1]
+            to_node = app_data[1].split('_')[1]
+            
+            # Log the disconnection
+            self.log_message({
+                'type': 'System',
+                'content': f'Connection removed between {from_node} and {to_node}'
+            })
+            
+            # Update workflow connections
+            if self.selected_workflow_id:
+                workflow = self.workflows.get(self.selected_workflow_id)
+                if workflow:
+                    workflow['connections'] = [
+                        conn for conn in workflow['connections']
+                        if not (conn['from'] == from_node and conn['to'] == to_node)
+                    ]
+                    self._update_workflow(self.selected_workflow_id, workflow)
+            
+        except Exception as e:
+            logger.error(f"Error handling node disconnection: {e}")
+
+    def _auto_layout_nodes(self):
+        """Automatically arrange nodes in a force-directed layout"""
+        try:
+            if not self.selected_workflow_id:
+                return
+                
+            workflow = self.workflows.get(self.selected_workflow_id)
+            if not workflow:
+                return
+            
+            # Create networkx graph from connections
+            G = nx.Graph()
+            
+            # Add nodes
+            for agent in workflow['agents']:
+                G.add_node(agent['id'])
+            
+            # Add edges
+            for conn in workflow['connections']:
+                G.add_edge(conn['from'], conn['to'])
+            
+            # Calculate layout
+            pos = nx.spring_layout(G)
+            
+            # Scale and translate positions to fit in the node editor
+            editor_width = dpg.get_item_width("agent_node_editor")
+            editor_height = dpg.get_item_height("agent_node_editor")
+            margin = 50
+            
+            for node_id, position in pos.items():
+                x = (position[0] + 1) * (editor_width - 2*margin)/2 + margin
+                y = (position[1] + 1) * (editor_height - 2*margin)/2 + margin
+                dpg.set_item_pos(f"node_{node_id}", [x, y])
+            
+        except Exception as e:
+            logger.error(f"Error in auto-layout: {e}")
+
+    def _add_node_context_menu(self):
+        """Add context menu for nodes"""
+        with dpg.handler_registry():
+            dpg.add_item_clicked_handler(callback=self._show_node_context_menu, button=dpg.mvMouseButton_Right)
+
+    def _show_node_context_menu(self, sender, app_data, user_data):
+        """Show context menu for node interactions"""
+        if dpg.does_item_exist("node_context_menu"):
+            dpg.delete_item("node_context_menu")
+        
+        # Get clicked node
+        clicked_node = dpg.get_item_info(sender)["parent"]
+        if not clicked_node.startswith("node_"):
+            return
+            
+        node_id = clicked_node.split("_")[1]
+        
+        # Create context menu
+        with dpg.window(label="Node Menu", tag="node_context_menu", popup=True):
+            dpg.add_text(f"Node: {node_id}")
+            dpg.add_separator()
+            
+            # Add menu items
+            dpg.add_menu_item(
+                label="View Details",
+                callback=lambda: self.view_agent_details(node_id)
+            )
+            dpg.add_menu_item(
+                label="Reset Position",
+                callback=lambda: dpg.reset_pos(clicked_node)
+            )
+            dpg.add_menu_item(
+                label="Remove Node",
+                callback=lambda: self._remove_agent_node(node_id)
+            )
+
+    def _remove_agent_node(self, agent_id: str):
+        """Remove an agent node from the editor"""
+        try:
+            # Remove from workflow
+            if self.selected_workflow_id:
+                workflow = self.workflows.get(self.selected_workflow_id)
+                if workflow:
+                    workflow['agents'] = [
+                        agent for agent in workflow['agents']
+                        if agent['id'] != agent_id
+                    ]
+                    workflow['connections'] = [
+                        conn for conn in workflow['connections']
+                        if conn['from'] != agent_id and conn['to'] != agent_id
+                    ]
+                    self._update_workflow(self.selected_workflow_id, workflow)
+            
+            # Remove node from editor
+            dpg.delete_item(f"node_{agent_id}")
+            
+            self.log_message({
+                'type': 'System',
+                'content': f'Removed agent {agent_id} from workflow'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error removing agent node: {e}")
+            
+
+    def _setup_message_log(self):
+        """Setup the message log panel"""
+        with dpg.child_window(label="Message Log", height=-1):
+            # Add message filter controls
+            with dpg.group(horizontal=True):
+                dpg.add_combo(
+                    label="Filter",
+                    items=["All", "Info", "Warning", "Error"],
+                    default_value="All",
+                    callback=self._filter_messages,
+                    tag="message_filter"
+                )
+                dpg.add_button(label="Clear", callback=self._clear_messages)
+            
+            # Message log container
+            dpg.add_child_window(tag="message_list", height=-1)
+
+    def _setup_agent_list(self):
+        """Enhanced agent list setup with type information"""
+        with dpg.collapsing_header(label="Agent List", default_open=True):
+            # Add agent type filter
+            dpg.add_combo(
+                label="Filter by Type",
+                items=["All", "Research", "Code", "Viz", "QA", "PM"],
+                default_value="All",
+                callback=self._filter_agents,
+                tag="agent_type_filter"
+            )
+            
+            # Enhanced listbox with agent types
+            dpg.add_listbox(
+                tag="agent_list",
+                items=[],
+                num_items=10,
+                callback=self._on_agent_selected,
+                width=-1
+            )
+
+    def _on_agent_selected(self, sender, app_data):
+        """Handle agent selection from list"""
+        self.selected_agent_id = app_data
+        self._view_agent_details()
+        self.logger.debug(f"Selected agent: {app_data}")
+
+    def _get_agent_type_for_workflow(self, workflow_type: str) -> str:
+        """Determine appropriate agent type based on workflow type"""
+        type_mapping = {
+            "research": "Research",
+            "development": "Code",
+            "viz": "Viz",
+            "qa": "QA",
+            "management": "PM"
+        }
+        return type_mapping.get(workflow_type.lower(), "Code")
+
+    def _view_agent_details(self):
+        """Enhanced agent details view"""
+        if not hasattr(self, 'selected_agent_id'):
+            return
+            
+        agent = self.agents.get(self.selected_agent_id)
+        if not agent:
+            return
+        
+        # Create or update details window with enhanced information
+        if not dpg.does_item_exist("agent_details_window"):
+            with dpg.window(
+                label="Agent Details",
+                tag="agent_details_window",
+                pos=(int(self.width * 0.3), int(self.height * 0.3)),
+                width=400,
+                height=300,
+                show=True
+            ):
+                # Add collapsing headers for organized information
+                with dpg.collapsing_header(label="Basic Info", default_open=True):
+                    dpg.add_text("", tag="agent_basic_info")
+                    
+                with dpg.collapsing_header(label="Performance", default_open=True):
+                    dpg.add_text("", tag="agent_performance")
+                    
+                with dpg.collapsing_header(label="Tasks", default_open=True):
+                    dpg.add_text("", tag="agent_tasks")
+        
+        # Update information sections
+        basic_info = (
+            f"Agent ID: {agent.name}\n"
+            f"Type: {agent.agent_type}\n"
+            f"Role: {agent.role}\n"
+            f"Status: {agent.status}"
+        )
+        dpg.set_value("agent_basic_info", basic_info)
+        
+        performance_info = (
+            f"CPU Usage: {agent.cpu_usage:.1f}%\n"
+            f"Memory Usage: {agent.memory_usage:.1f}MB\n"
+            f"Last Active: {agent.last_active.strftime('%H:%M:%S')}"
+        )
+        dpg.set_value("agent_performance", performance_info)
+        
+        tasks_info = (
+            f"Tasks Completed: {agent.tasks_completed}\n"
+            f"Current Task: {agent.current_task or 'None'}"
+        )
+        dpg.set_value("agent_tasks", tasks_info)
+        
+        dpg.show_item("agent_details_window")
+        
+    def _filter_agents(self, sender, app_data):
+        """Filter agents by type"""
+        selected_type = app_data
+        if selected_type == "All":
+            self._update_agent_list()
+        else:
+            filtered_agents = {
+                name: agent for name, agent in self.agents.items()
+                if agent.agent_type == selected_type
+            }
+            agent_items = [agent.display_name for agent in filtered_agents.values()]
+            dpg.configure_item("agent_list", items=agent_items)
+
+    def start_new_workflow(self, sender, app_data):
+        """Enhanced workflow creation with proper agent type assignment"""
+        try:
+            workflow_type = dpg.get_value("workflow_type")
+            task = dpg.get_value("task_input")
+            
+            if not task.strip():
+                self.log_message("Task description required", "error")
+                return
+            
+            # Create workflow
+            workflow_id = self.workflow_manager.create_workflow(
+                workflow_type=workflow_type,
+                task=task
+            )
+            
+            # Determine appropriate agent type based on workflow
+            agent_type = self._get_agent_type_for_workflow(workflow_type)
+            
+            # Create agent with proper type
+            agent = AgentState(
+                name=f"agent_{len(self.agents)}",
+                agent_type=agent_type,
+                role=workflow_type,
+                status="active",
+                tasks_completed=0,
+                memory_usage=0.0,
+                cpu_usage=0.0,
+                last_active=datetime.now(),
+                current_task=task
+            )
+            self.agents[agent.name] = agent
+            
+            # **Add this line to create the agent node in the UI**
+            self._add_agent_node(agent)
+            
+            # Update UI
+            self._update_agent_list()
+            self.log_message(f"Started new {workflow_type} workflow with {agent_type} agent: {workflow_id}", "info")
+            
+        except Exception as e:
+            self.logger.error(f"Error starting workflow: {e}")
+            self.log_message(f"Error starting workflow: {str(e)}", "error")
+
+
+
+    def _update_agent_list(self):
+        """Update the agent list with type information"""
+        if dpg.does_item_exist("agent_list"):
+            # Format agent names to include their types
+            agent_items = [
+                agent.display_name
+                for agent in self.agents.values()
+            ]
+            dpg.configure_item("agent_list", items=agent_items)
+
+    def log_message(self, message: str, level: str = "info"):
+        """Add a message to the log"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        with dpg.mutex():
+            if dpg.does_item_exist("message_list"):
+                dpg.add_text(
+                    f"[{timestamp}] {level.upper()}: {message}",
+                    parent="message_list",
+                    color=self._get_message_color(level)
+                )
+
+    def _get_message_color(self, level: str) -> tuple:
+        """Get color for different message types"""
+        colors = {
+            "info": (255, 255, 255),    # White
+            "success": (0, 255, 0),     # Green
+            "warning": (255, 255, 0),   # Yellow
+            "error": (255, 0, 0)        # Red
+        }
+        return colors.get(level, (255, 255, 255))
+
+    def _clear_messages(self):
+        """Clear all messages from the log"""
+        if dpg.does_item_exist("message_list"):
+            dpg.delete_item("message_list", children_only=True)
+
+    def _filter_messages(self, sender, app_data):
+        """Filter messages based on level"""
+        # To be implemented when we add message storage
+        pass

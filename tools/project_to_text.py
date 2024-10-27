@@ -87,7 +87,7 @@ if __name__ == '__main__':
         ignore_dirs={
             '.git', '__pycache__', '.pytest_cache',
             '.venv', 'venv', 'node_modules', '.idea',
-            'workspace', 'docker_workspace', 'reference'
+            'workspace', 'docker_workspace','reference'
         },
         ignore_files={
             '.gitignore', '.env', '*.pyc', '.DS_Store',

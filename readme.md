@@ -63,6 +63,35 @@ graph TD
 - **scripts/**: Batch scripts for setting up and managing the Docker environment.
 - **docker/**: Docker configuration files for building and running the system.
 
+## Overview
+
+1. Architecture Overview:
+- GUI Layer: Handles visualization and user interaction
+- Core System: Manages workflows, tasks, and team configuration
+- Specialized Agents: Different types of AI agents for specific tasks
+- Docker Environment: Provides isolated execution environment
+
+2. Key Features:
+- Visual workflow monitoring with node editor
+- Real-time metrics tracking
+- Docker containerization for safe code execution
+- Specialized agent roles (Research, Code, Viz, QA, PM)
+- Task decomposition and dynamic team formation
+
+3. Main Components:
+- MultiAgentSystem: Main orchestrator class
+- AgentMonitor: Handles UI and visualization
+- WorkflowManager: Manages agent workflows
+- TeamManager: Handles agent team composition
+- DockerWorkspaceManager: Manages Docker containers and volumes
+
+4. Workflow:
+1. System initialization (configuration, Docker setup)
+2. Monitor setup (UI components, message queue)
+3. Workflow creation and team assignment
+4. Real-time monitoring and visualization
+5. Graceful shutdown and cleanup
+
 ## Setup
 
 To set up the project, follow these steps:

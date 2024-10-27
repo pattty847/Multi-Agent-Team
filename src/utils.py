@@ -4,9 +4,9 @@ import signal
 import logging
 from typing import Optional
 
-from src.agents import EnhancedAssistantAgent, EnhancedUserProxy
-from src.config import SystemConfig
-from src.executor import EnhancedDockerExecutor
+from src.agents import EnhancedUserProxy
+from src.core.config import SystemConfig
+from src.core.executor import EnhancedDockerExecutor
 
 class GracefulExitHandler:
     def __init__(self):

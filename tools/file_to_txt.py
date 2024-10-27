@@ -19,4 +19,4 @@ def convert_py_to_txt(input_file, output_file):
 
 # Example usage
 # Replace 'your_file.py' with your Python file and 'output.txt' with your desired text file name
-convert_py_to_txt(".venv\\Lib\\site-packages\\dearpygui\\demo.py", "monitor.txt")
+convert_py_to_txt(".venv\\Lib\\site-packages\\dearpygui\\demo.py", "dearpygui.txt")
