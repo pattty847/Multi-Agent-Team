@@ -1,6 +1,7 @@
 # Multi-Agent System Project
+![image](https://github.com/user-attachments/assets/374003b2-31f8-43d5-be7c-432ab63a4edf)
 
-This project is a multi-agent system designed to assist with coding, analysis, and research tasks. It leverages AI to interact with users, execute code, and perform web searches for research papers.
+This project is a multi-agent system designed to assist with coding, analysis, and research tasks. It leverages AI to interact with users, execute code, and perform web searches for research papers. The system now includes an intuitive drag-and-drop interface for designing workflows and monitoring their progress in real-time.
 
 ## Table of Contents
 
@@ -55,7 +56,6 @@ graph TD
 - Practical management principles vs theoretical frameworks
 - Focus on tracking and improvement vs just task completion
 
-
 ## Project Structure
 
 - **src/**: Contains the main source code for the agents, configuration, and execution logic.
@@ -72,6 +72,7 @@ graph TD
 - Docker Environment: Provides isolated execution environment
 
 2. Key Features:
+- Intuitive drag-and-drop workflow design
 - Visual workflow monitoring with node editor
 - Real-time metrics tracking
 - Docker containerization for safe code execution
@@ -143,3 +144,4 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+```
