@@ -25,3 +25,5 @@ workspace/*
 notebooks/.ipynb_checkpoints
 testing/
 docs/
+full-project.txt
+dearpygui.txt
