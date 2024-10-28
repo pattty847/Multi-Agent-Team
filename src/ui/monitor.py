@@ -192,7 +192,8 @@ class AgentMonitoringSystem:
                 with dpg.tab(label="Performance"):
                     # System-wide metrics
                     with dpg.group(horizontal=True):
-                        with dpg.child_window(width=300):
+                        # Takes up full window for now, can add more windows if needed. Adjust width of first window. 
+                        with dpg.child_window(width=-1):
                             dpg.add_text("System Overview")
                             dpg.add_separator()
                             self.system_metrics = {
