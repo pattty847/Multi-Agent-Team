@@ -1,0 +1,35 @@
+agent_colors:
+  Code:
+  - 0
+  - 255
+  - 150
+  - 255
+  PM:
+  - 150
+  - 0
+  - 255
+  - 255
+  QA:
+  - 255
+  - 0
+  - 150
+  - 255
+  Research:
+  - 0
+  - 150
+  - 255
+  - 255
+  Viz:
+  - 255
+  - 150
+  - 0
+  - 255
+config_name: ui
+max_history: 100
+max_messages: 1000
+metrics_update_interval: 1.0
+node_update_interval: 0.1
+theme: dark
+window_height: 1080
+window_title: Multi-Agent System Monitor
+window_width: 1920

@@ -1,7 +1,7 @@
 # src/agents/user_proxy.py
 from typing import Optional, Dict
 from autogen import UserProxyAgent
-from src.core.config import SystemConfig
+from src.config.agent_config import SystemConfig
 
 class EnhancedUserProxy(UserProxyAgent):
     """Enhanced user proxy with better termination handling and history"""

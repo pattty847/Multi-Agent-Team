@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 from src.core.teams import TeamConfiguration
-from .config import SystemConfig
+from ..config.agent_config import SystemConfig
 
 class WorkflowManager:
     """Manages agent workflows and team coordination"""

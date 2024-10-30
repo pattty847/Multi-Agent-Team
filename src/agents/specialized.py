@@ -11,7 +11,7 @@ import logging
 import os
 from pathlib import Path
 
-from src.core.config import SystemConfig
+from src.config.agent_config import SystemConfig
 
 logger = logging.getLogger(__name__)
 

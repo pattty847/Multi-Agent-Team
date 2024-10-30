@@ -5,7 +5,7 @@ import logging
 from typing import Optional
 
 from src.agents import EnhancedUserProxy
-from src.core.config import SystemConfig
+from src.config.agent_config import SystemConfig
 from src.core.executor import EnhancedDockerExecutor
 
 class GracefulExitHandler:

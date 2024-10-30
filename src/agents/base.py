@@ -1,7 +1,7 @@
 # src/agents/base.py
 from typing import Optional, Dict
 from autogen import AssistantAgent, ConversableAgent
-from src.core.config import SystemConfig
+from src.config.agent_config import SystemConfig
 
 class BaseAssistantAgent(AssistantAgent):
     """Base class for all assistant agents with common functionality"""

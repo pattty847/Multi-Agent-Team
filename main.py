@@ -1,63 +1,52 @@
 # main.py
-
-import dearpygui.dearpygui as dpg
-import tkinter as tk
+import sys
+import logging
 from src.ui.monitor import AgentMonitoringSystem
-from src.core.config import SystemConfig
-
-
-def get_screen_size_percentage(percentage=0.80):
-    # Create a root window and hide it
-    root = tk.Tk()
-    root.withdraw()
-
-    # Get the screen width and height
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-
-    # Calculate the width and height based on the percentage
-    width = int(screen_width * percentage)
-    height = int(screen_height * percentage)
-
-    # Destroy the root window
-    root.destroy()
-
-    return width, height
+from src.ui.state.app_state import AppState
+from src.ui.state.store import StateEvent
 
 def main():
-    # Create DPG context first
-    dpg.create_context()
+    # Set up logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    monitor = None
     
     try:
-        # Initialize system
-        config = SystemConfig()
-        monitor = AgentMonitoringSystem(config)
-        width, height = get_screen_size_percentage()
+        # Create and initialize monitoring system
+        monitor = AgentMonitoringSystem()
         
-        # Create viewport (moved from setup_ui)
-        dpg.create_viewport(
-            title="Agent Monitoring System",
-            width=width,
-            height=height
-        )
-        
-        # Setup UI elements
+        # Set up UI
         monitor.setup_ui()
         
-        # Setup DPG
-        dpg.setup_dearpygui()
+        # Example: Create a test agent with proper data structure
+        monitor.app_state.state_store.update(
+            StateEvent.AGENT_ADDED,
+            {
+                'name': 'test_researcher',
+                'agent_id': 'test_researcher',
+                'agent_type': 'Research',
+                'status': 'idle',
+                'current_task': None,
+                'metrics': {
+                    'cpu_usage': 0.0,
+                    'memory_usage': 0.0,
+                    'tasks_completed': 0
+                },
+                'position': (100, 100)
+            }
+        )
         
-        # Show the viewport
-        dpg.show_viewport()
-        
-        # Start the main loop
+        # Run the application
         monitor.run()
         
     except Exception as e:
-        print(f"Error during startup: {str(e)}")
+        logger.error(f"Application error: {e}")
         raise
     finally:
-        dpg.destroy_context()
+        # Ensure cleanup only if monitor was created
+        if monitor is not None:
+            monitor.cleanup()
 
 if __name__ == "__main__":
     main()
