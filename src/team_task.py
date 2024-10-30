@@ -1,7 +1,8 @@
 # src/team_tasks.py
 from typing import List, Dict
+
+from src.config.system_config import SystemConfig
 from .agents.specialized import TeamManager
-from .config import SystemConfig
 from autogen import GroupChat, GroupChatManager
 
 class GroupTaskManager:

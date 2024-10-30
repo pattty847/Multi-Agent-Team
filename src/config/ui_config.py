@@ -1,7 +1,7 @@
 # src/config/ui_config.py
 from dataclasses import dataclass, field
 from typing import Dict
-from .base_config import BaseConfig
+from src.config.base_config import BaseConfig
 
 @dataclass
 class UIConfig(BaseConfig):

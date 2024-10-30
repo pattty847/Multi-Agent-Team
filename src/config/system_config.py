@@ -1,8 +1,9 @@
 # src/config/system_config.py
 from dataclasses import dataclass, field
 import os
-from .base_config import BaseConfig
 import logging
+
+from src.config.base_config import BaseConfig
 
 logger = logging.getLogger(__name__)
 

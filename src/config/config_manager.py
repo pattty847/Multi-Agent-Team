@@ -37,7 +37,10 @@ class ConfigManager:
                     name = config_data.get('name')
                     agent_type = config_data.get('agent_type')
                     if name and agent_type:
-                        self.create_agent_config(name, agent_type, **config_data)
+                        if name in self.agent_configs:
+                            logger.warning(f"Duplicate agent name '{name}' found in {config_file}. Skipping.")
+                        else:
+                            self.create_agent_config(**config_data)
             except Exception as e:
                 logger.error(f"Error loading agent config {config_file}: {e}")
                 

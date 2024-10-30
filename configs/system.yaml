@@ -11,7 +11,7 @@ max_agents: 10
 max_log_size: 10000000
 max_retries: 3
 max_tokens: 2000
-openai_api_key: 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
+openai_api_key: ${OPENAI_API_EKY}
 request_timeout: 60
 version: 1.0.0
 workspace_dir: workspace

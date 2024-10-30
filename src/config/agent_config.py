@@ -6,17 +6,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from dataclasses import dataclass, field
-from typing import List
-
 @dataclass
-class AgentConfig:
+class AgentConfig(BaseConfig):
     """Agent-specific configuration settings"""
-    # Non-default fields
+    # Required fields
     name: str
     agent_type: str
     
-    # Default fields
+    # Optional fields with defaults
     system_message: str = ""
     temperature: float = 0.7
     top_p: float = 1.0
@@ -29,8 +26,17 @@ class AgentConfig:
     required_permissions: List[str] = field(default_factory=list)
     
     def __post_init__(self):
+        """Post initialization handling"""
+        # First validate required fields
+        self._validate_agent_config()
+        
+        # Set config name before loading
         self.config_name = f"agent_{self.name}"
-        self._load_config()
+        
+        # Load configuration from file (inherited from BaseConfig)
+        super().__post_init__()
+        
+        # Revalidate after loading to ensure loaded values are valid
         self._validate_agent_config()
         
     def _validate_agent_config(self):
