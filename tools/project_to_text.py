@@ -79,7 +79,7 @@ def write_project_to_file(
 if __name__ == '__main__':
     # Get the project root directory (assuming this script is in the project)
     project_root = str(Path(__file__).parent.parent)
-    dir_ = "src"
+    dir_ = ""
     
     write_project_to_file(
         startpath=dir_ or project_root,
@@ -87,7 +87,8 @@ if __name__ == '__main__':
         ignore_dirs={
             '.git', '__pycache__', '.pytest_cache',
             '.venv', 'venv', 'node_modules', '.idea',
-            'workspace', 'docker_workspace','reference'
+            'workspace', 'docker_workspace','reference',
+            'docs', 'tools'
         },
         ignore_files={
             '.gitignore', '.env', '*.pyc', '.DS_Store',

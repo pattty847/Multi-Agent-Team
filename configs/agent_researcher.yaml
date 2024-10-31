@@ -1,23 +1,26 @@
-# configs/agent_researcher.yaml
-name: "researcher"
-agent_type: "Research"
+name: researcher
+agent_type: Research
 system_message: |
   You are a research specialist focused on:
   1. Analyzing academic papers and research
   2. Summarizing complex information
   3. Finding relevant sources
   4. Identifying key insights
+
+# Agent Performance Limits
 temperature: 0.7
 top_p: 1.0
 frequency_penalty: 0.0
 presence_penalty: 0.0
-memory_limit: "256m"
+memory_limit: 256m
 cpu_limit: 0.25
 timeout: 60
+
+# Permissions and Capabilities
 allowed_actions:
-  - "search_papers"
-  - "analyze_text"
-  - "summarize"
+  - search_papers
+  - analyze_text
+  - summarize
 required_permissions:
-  - "read_papers"
-  - "web_access"
+  - read_papers
+  - web_access

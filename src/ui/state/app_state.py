@@ -10,10 +10,7 @@ class AppState:
         self.config_manager = ConfigManager()
         self.state_store = StateStore()
         self.event_bus = EventBus()
-        
-        # Load configurations
-        self.config_manager.load_all_configs()
-        
+                
         # Set up event handlers
         self._setup_event_handlers()
         

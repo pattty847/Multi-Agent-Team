@@ -3,6 +3,9 @@ from typing import Dict, Any, Callable, List
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
+import logging
+
+logger = logging.getLogger(__name__)
 
 class StateEvent(Enum):
     """Enum for different state change events"""
@@ -35,18 +38,22 @@ class StateStore:
             event: [] for event in StateEvent
         }
         self._history: List[StateChange] = []
+        logging.info("StateStore initialized.")
 
     def subscribe(self, event_type: StateEvent, callback: Callable):
         """Subscribe to state changes for a specific event type"""
         self._subscribers[event_type].append(callback)
+        logging.debug(f"Subscribed to {event_type} with callback {callback}.")
 
     def unsubscribe(self, event_type: StateEvent, callback: Callable):
         """Unsubscribe from state changes"""
         if callback in self._subscribers[event_type]:
             self._subscribers[event_type].remove(callback)
+            logging.debug(f"Unsubscribed from {event_type} with callback {callback}.")
 
     def update(self, event_type: StateEvent, data: Dict):
         """Update state and notify subscribers"""
+        logging.info(f"Updating state for event {event_type} with data {data}.")
         self._update_state(event_type, data)
         self._notify(event_type, data)
         self._record_change(event_type, data)
@@ -95,14 +102,17 @@ class StateStore:
         for callback in self._subscribers[event_type]:
             try:
                 callback(data)
+                logging.debug(f"Notified subscriber {callback} for event {event_type}.")
             except Exception as e:
-                print(f"Error in subscriber callback: {e}")
+                logging.error(f"Error in subscriber callback: {e}")
 
     def _record_change(self, event_type: StateEvent, data: Any):
         """Record state change in history"""
         change = StateChange(event_type=event_type, data=data)
         self._history.append(change)
+        logging.debug(f"Recorded state change: {change}.")
         
         # Limit history size
         if len(self._history) > 1000:
             self._history = self._history[-1000:]
+            logging.info("History size exceeded 1000 entries, trimming history.")

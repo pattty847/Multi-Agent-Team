@@ -1,6 +1,5 @@
-# src/ui/components/settings_panel.py
 import dearpygui.dearpygui as dpg
-from typing import Any, Optional
+from typing import Any
 from src.ui.state.app_state import AppState
 from src.ui.state.store import StateEvent
 
@@ -9,6 +8,7 @@ class SettingsPanel:
     def __init__(self, parent_id: int, app_state: AppState):
         self.parent_id = parent_id
         self.app_state = app_state
+        self.config = self.app_state.config_manager  # Direct reference for convenience
         self.visible = False
     
     def setup(self):
@@ -22,22 +22,17 @@ class SettingsPanel:
             pos=(100, 100)
         ):
             with dpg.tab_bar():
-                # System Settings
                 with dpg.tab(label="System"):
                     self._create_system_settings()
                 
-                # UI Settings
                 with dpg.tab(label="UI"):
                     self._create_ui_settings()
                 
-                # Agent Settings
                 with dpg.tab(label="Agents"):
                     self._create_agent_settings()
     
     def _create_system_settings(self):
         """Create system settings controls"""
-        system_config = self.app_state.config_manager.system_config
-        
         dpg.add_text("System Configuration")
         dpg.add_separator()
         
@@ -45,13 +40,13 @@ class SettingsPanel:
         dpg.add_text("Docker Settings")
         dpg.add_input_text(
             label="Docker Image",
-            default_value=system_config.docker_image,
-            # callback=self._on_docker_image_change
+            default_value=self.config.system.docker_image,
+            callback=lambda s, a: setattr(self.config.system, 'docker_image', a)
         )
         dpg.add_input_text(
             label="Memory Limit",
-            default_value=system_config.container_memory_limit,
-            # callback=self._on_memory_limit_change
+            default_value=self.config.system.container_memory_limit,
+            callback=lambda s, a: setattr(self.config.system, 'container_memory_limit', a)
         )
         
         # Logging settings
@@ -59,14 +54,12 @@ class SettingsPanel:
         dpg.add_combo(
             label="Log Level",
             items=["DEBUG", "INFO", "WARNING", "ERROR"],
-            default_value=system_config.log_level,
-            # callback=self._on_log_level_change
+            default_value=self.config.system.log_level,
+            callback=lambda s, a: setattr(self.config.system, 'log_level', a)
         )
     
     def _create_ui_settings(self):
         """Create UI settings controls"""
-        ui_config = self.app_state.config_manager.ui_config
-        
         dpg.add_text("UI Configuration")
         dpg.add_separator()
         
@@ -74,15 +67,20 @@ class SettingsPanel:
         dpg.add_combo(
             label="Theme",
             items=["dark", "light"],
-            default_value=ui_config.theme,
-            # callback=self._on_theme_change
+            default_value=self.config.ui.theme,
+            callback=lambda s, a: setattr(self.config.ui, 'theme', a)
         )
         
-        # Update intervals
-        dpg.add_input_float(
-            label="Metrics Update Interval",
-            default_value=ui_config.metrics_update_interval,
-            # callback=self._on_metrics_interval_change
+        # Window settings
+        dpg.add_input_int(
+            label="Window Width",
+            default_value=self.config.ui.window_width,
+            callback=lambda s, a: setattr(self.config.ui, 'window_width', a)
+        )
+        dpg.add_input_int(
+            label="Window Height",
+            default_value=self.config.ui.window_height,
+            callback=lambda s, a: setattr(self.config.ui, 'window_height', a)
         )
     
     def _create_agent_settings(self):
@@ -91,7 +89,7 @@ class SettingsPanel:
         dpg.add_separator()
         
         # Agent selection
-        agent_names = list(self.app_state.config_manager.agent_configs.keys())
+        agent_names = list(self.config.agent_configs.keys())
         dpg.add_combo(
             label="Select Agent",
             items=agent_names,
@@ -103,7 +101,7 @@ class SettingsPanel:
     
     def _on_agent_select(self, sender, app_data):
         """Handle agent selection"""
-        agent_config = self.app_state.config_manager.get_agent_config(app_data)
+        agent_config = self.config.get_agent_config(app_data)
         if not agent_config:
             return
             
@@ -114,41 +112,47 @@ class SettingsPanel:
             # Basic settings
             dpg.add_input_text(
                 label="System Message",
-                default_value=agent_config.system_message,
+                default_value=agent_config.get('system_message', ''),
                 multiline=True,
                 callback=lambda s, a: self._update_agent_config(app_data, 'system_message', a)
             )
             
             dpg.add_input_float(
                 label="Temperature",
-                default_value=agent_config.temperature,
+                default_value=agent_config.get('temperature', 0.7),
                 callback=lambda s, a: self._update_agent_config(app_data, 'temperature', a)
             )
             
             # Resource limits
             dpg.add_input_text(
                 label="Memory Limit",
-                default_value=agent_config.memory_limit,
+                default_value=agent_config.get('memory_limit', '256m'),
                 callback=lambda s, a: self._update_agent_config(app_data, 'memory_limit', a)
             )
             
             dpg.add_input_float(
                 label="CPU Limit",
-                default_value=agent_config.cpu_limit,
+                default_value=agent_config.get('cpu_limit', 0.25),
                 callback=lambda s, a: self._update_agent_config(app_data, 'cpu_limit', a)
             )
     
     def _update_agent_config(self, agent_name: str, key: str, value: Any):
         """Update agent configuration"""
-        self.app_state.state_store.update(
-            StateEvent.CONFIG_CHANGED,
-            {
-                'agent_config': {
-                    'name': agent_name,
-                    key: value
+        agent_config = self.config.get_agent_config(agent_name)
+        if agent_config:
+            agent_config[key] = value
+            self.config.agent_configs[agent_name] = agent_config
+            
+            # Notify state store of change
+            self.app_state.state_store.update(
+                StateEvent.CONFIG_CHANGED,
+                {
+                    'agent_config': {
+                        'name': agent_name,
+                        key: value
+                    }
                 }
-            }
-        )
+            )
     
     def show(self):
         """Show the settings panel"""

@@ -1,9 +1,11 @@
 # src/ui/monitor.py
+import os
 import dearpygui.dearpygui as dpg
 import logging
 from pathlib import Path
 from typing import Optional
 
+from src.config.config_manager import ConfigManager
 from src.ui.state.app_state import AppState
 from src.ui.components.agent_list import AgentListView
 from src.ui.components.metrics_view import MetricsView
@@ -20,30 +22,30 @@ class AgentMonitoringSystem:
     def __init__(self):
         # Initialize application state
         self.app_state = AppState()
+        self.config = self.app_state.config_manager
         
-        # Get configuration
-        self.ui_config = self.app_state.config_manager.ui_config
-        self.system_config = self.app_state.config_manager.system_config
+        # Set up logging based on system config
+        self._setup_logging()
         
         # Initialize components (will be set up in setup_ui)
         self.agent_list: Optional[AgentListView] = None
         self.metrics_view: Optional[MetricsView] = None
         self.node_editor: Optional[NodeEditorView] = None
         self.message_logger: Optional[MessageLogger] = None
-        self.settings_panel: Optional[SettingsPanel] = None
-        
-        # Set up logging
-        self._setup_logging()
 
     def _setup_logging(self):
         """Configure logging based on system configuration"""
         log_config = {
-            'level': getattr(logging, self.system_config.log_level),
+            'level': getattr(logging, self.config.system.log_level),
             'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            'filename': self.system_config.log_file,
-            'maxBytes': self.system_config.max_log_size,
-            'backupCount': self.system_config.backup_count
+            'filename': self.config.system.log_file,
+            'maxBytes': self.config.system.max_log_size,
+            'backupCount': self.config.system.backup_count
         }
+        
+        # Create log directory if needed
+        log_path = Path(log_config['filename']).parent
+        log_path.mkdir(parents=True, exist_ok=True)
         
         logging.basicConfig(**log_config)
         
@@ -53,18 +55,64 @@ class AgentMonitoringSystem:
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         logging.getLogger('').addHandler(console_handler)
+        
+        logger = logging.getLogger(__name__)
+        logger.info("Logging system initialized")
 
-    def setup_ui(self):
-        """Initialize the monitoring UI with DearPyGui"""
+    def _setup_dpg(self):
+        """Setup DearPyGui context and windows"""
+        dpg.create_context()
+        
+        # Configure window based on UI config
+        self.viewport = dpg.create_viewport(
+            title=self.config.ui.window_title,
+            width=int(self.config.ui.window_width * self.config.ui.window_resulution_pct),
+            height=int(self.config.ui.window_height * self.config.ui.window_resulution_pct)
+        )
+        
+        # Set DPI scale if specified
+        if hasattr(self.config.ui, 'dpi_scale'):
+            dpg.set_global_font_scale(self.config.ui.dpi_scale)
+        
+        # Set initial window position if specified
+        if hasattr(self.config.ui, 'window_pos_x') and hasattr(self.config.ui, 'window_pos_y'):
+            dpg.set_viewport_pos(
+                [self.config.ui.window_pos_x, 
+                 self.config.ui.window_pos_y]
+            )
+        
+        # Maximize if configured
+        if getattr(self.config.ui, 'window_is_maximized', False):
+            dpg.maximize_viewport()
+        
+        self._setup_ui()
+        
+        dpg.setup_dearpygui()
+        dpg.show_viewport()
+        
+        # Set the primary window
+        dpg.set_primary_window("primary_window", True)
+
+    def _get_openai_key(self) -> str:
+        """Get OpenAI API key from environment with fallback to config"""
+        key = os.getenv('OPENAI_API_KEY')
+        if not key:
+            key = self.config.system.openai_api_key
+            if key.startswith('${') and key.endswith('}'):
+                # If still using variable syntax in config, warn and return empty
+                logger.warning("OpenAI API key not found in environment variables")
+                return ''
+        return key
+
+    def _setup_ui(self):
         try:
             logger.debug("Starting UI setup")
-            dpg.create_context()
             # Create main window
             with dpg.window(
-                label=self.ui_config.window_title,
+                label=self.config.ui.window_title,
                 tag="primary_window",
-                width=self.ui_config.window_width,
-                height=self.ui_config.window_height,
+                width=int(self.config.ui.window_width * self.config.ui.window_resulution_pct),
+                height=int(self.config.ui.window_height * self.config.ui.window_resulution_pct),
                 menubar=True
             ):
                 # Setup menu bar
@@ -73,7 +121,10 @@ class AgentMonitoringSystem:
                 # Main layout with horizontal split
                 with dpg.group(horizontal=True):
                     # Left panel - Agent List and Controls
-                    with dpg.child_window(width=int(self.ui_config.window_width * 0.25), height=-1) as left_panel:
+                    with dpg.child_window(
+                        width=int(self.config.ui.window_width * 0.20),
+                        height=-1
+                    ) as left_panel:
                         # Initialize agent list
                         self.agent_list = AgentListView(left_panel)
                         self.agent_list.setup()
@@ -98,10 +149,7 @@ class AgentMonitoringSystem:
             
             # Initialize settings panel
             self.settings_panel = SettingsPanel("primary_window", self.app_state)
-            self.settings_panel.setup()
-            
-            # Set as primary window
-            dpg.set_primary_window("primary_window", True)
+            self.settings_panel.setup()        
             
             # Register state change handlers
             self._setup_state_handlers()
@@ -181,44 +229,38 @@ class AgentMonitoringSystem:
     def _handle_config_change(self, data):
         """Handle configuration changes"""
         # Reload configurations
-        self.ui_config = self.app_state.config_manager.ui_config
-        self.system_config = self.app_state.config_manager.system_config
+        self.config = self.app_state.config_manager
         
         # Update UI components if needed
         self.reset_layout()
 
     def run(self):
-        """Main application loop"""
+        """Run the monitoring system"""
         try:
-            logger.debug("Starting main loop")
+            # Ensure OpenAI key is available
+            if not self._get_openai_key():
+                logger.error("No OpenAI API key found. Please set OPENAI_API_KEY environment variable")
+                return
             
-            while dpg.is_dearpygui_running():
-                # Process any pending state updates
-                self.app_state.event_bus.process_events()
-                
-                # Render frame
-                dpg.render_dearpygui_frame()
-                
+            # Start the UI
+            self._setup_dpg()
+            
+            # Start event loop
+            dpg.start_dearpygui()
+            
         except Exception as e:
-            logger.error(f"Error in run method: {str(e)}")
+            logger.error(f"Error running monitoring system: {str(e)}")
             raise
         finally:
             self.cleanup()
-
+            
     def cleanup(self):
-        """Clean up resources"""
+        """Cleanup resources"""
         try:
-            # Stop event bus
-            self.app_state.event_bus.stop()
-            
-            # Save configurations
-            self.app_state.config_manager.save_all_configs()
-            
-            # Clean up DPG
+            self.cleanup_and_exit()
             dpg.destroy_context()
-            
         except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
+            logger.error(f"Error during cleanup: {str(e)}")
 
     def cleanup_and_exit(self):
         """Clean up and exit application"""
@@ -234,5 +276,5 @@ class AgentMonitoringSystem:
         """Show about dialog"""
         with dpg.window(label="About", modal=True, show=True):
             dpg.add_text("Multi-Agent System Monitor")
-            dpg.add_text(f"Version: {self.system_config.version}")
+            dpg.add_text(f"Version: {getattr(self.config.system, 'version', 'N/A')}")
             dpg.add_button(label="Close", callback=lambda: dpg.delete_item("About"))

@@ -1,13 +1,14 @@
 # main.py
 import sys
 import logging
+import dearpygui.dearpygui as dpg
 from src.ui.monitor import AgentMonitoringSystem
 from src.ui.state.app_state import AppState
 from src.ui.state.store import StateEvent
 
 def main():
     # Set up logging
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger(__name__)
     
     monitor = None
@@ -15,9 +16,7 @@ def main():
     try:
         # Create and initialize monitoring system
         monitor = AgentMonitoringSystem()
-        
-        # Set up UI
-        monitor.setup_ui()
+        monitor._setup_dpg()
         
         # Example: Create a test agent with proper data structure
         monitor.app_state.state_store.update(
@@ -38,7 +37,8 @@ def main():
         )
         
         # Run the application
-        monitor.run()
+        dpg.start_dearpygui()
+
         
     except Exception as e:
         logger.error(f"Application error: {e}")
