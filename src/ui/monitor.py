@@ -257,7 +257,6 @@ class AgentMonitoringSystem:
     def cleanup(self):
         """Cleanup resources"""
         try:
-            self.cleanup_and_exit()
             dpg.destroy_context()
         except Exception as e:
             logger.error(f"Error during cleanup: {str(e)}")
